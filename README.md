@@ -13,29 +13,23 @@ App web móvil para que cada profesor gestione su lista de preceptuados y regist
 
 Repositorio: https://github.com/Managerdlpulpo/preceptor
 
-Dominio: **https://andelmanager.es**
+Dominio de la app: **https://preceptor.andelmanager.es**
+
+(La web principal de entrenador en andelmanager.es no se toca.)
 
 ### DNS (PiensaSolutions)
 
-En el panel DNS de andelmanager.es crea:
+En el panel DNS de andelmanager.es crea **solo** este registro:
 
 | Tipo  | Host / Nombre | Valor / Destino              |
 |-------|---------------|------------------------------|
-| CNAME | @             | managerdlpulpo.github.io     |
-| CNAME | www           | managerdlpulpo.github.io     |
+| CNAME | preceptor     | managerdlpulpo.github.io     |
 
-Si el panel no deja CNAME en `@`, usa un registro A con las IPs de GitHub Pages:
-
-- 185.199.108.153
-- 185.199.109.153
-- 185.199.110.153
-- 185.199.111.153
-
-Y un CNAME `www` → `managerdlpulpo.github.io`.
+No modifiques los registros de `@` ni de `www`.
 
 ### GitHub Pages
 
 1. Settings → Pages.
 2. Source: Deploy from branch → `main` / `/ (root)`.
-3. Custom domain: `andelmanager.es` (el archivo CNAME ya está en el repo).
+3. Custom domain: `preceptor.andelmanager.es` (el archivo CNAME ya está en el repo).
 4. Marca **Enforce HTTPS** cuando esté disponible.

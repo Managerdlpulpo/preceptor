@@ -1,0 +1,45 @@
+PRECEPTOR
+=========
+
+App para que cada profesor gestione su propia lista de preceptuados
+y registre las reuniones de tutoría. Pensada para el móvil.
+
+CÓMO EMPEZAR
+------------
+1. Abre index.html en el navegador.
+2. Crea tu perfil (nombre, iniciales, curso escolar).
+3. Añade alumnos uno a uno, o importa un Excel / CSV.
+4. En el móvil: Añadir a pantalla de inicio.
+
+VARIOS PROFESORES
+-----------------
+En Ajustes → "Nuevo profesor" se crea otro perfil en el mismo
+dispositivo. Cada uno tiene su lista, objetivos y reuniones.
+También puedes pasar la carpeta a otro compañero y que cree
+la suya desde cero.
+
+LISTA DE ALUMNOS
+----------------
+- Añadir / editar / dar de baja desde Alumnos o la ficha.
+- Importar Excel o CSV. Columnas reconocidas:
+  Nombre, Apellidos, Curso, Nacimiento, Primera tutoria, Preceptor, Notas
+- En Ajustes hay un botón "Plantilla Excel" para no inventar el formato.
+
+AJUSTES QUE PUEDE CAMBIAR CADA PROFESOR
+---------------------------------------
+- Nombre, iniciales, centro, curso escolar
+- Equipo de preceptores (AMB, JML…)
+- Meses del seguimiento
+- Tipos de reunión
+- Catálogo de objetivos (luego se marcan en cada ficha)
+- Preceptor que registra por defecto
+
+DATOS
+-----
+Se guardan solos en la memoria interna de este navegador.
+No hay cuenta ni Google Drive.
+Si borras los datos del navegador o cambias de teléfono, se pierde
+la lista (salvo que hayas descargado antes el Excel o el JSON).
+
+Si ya usabas la versión anterior con los 16 alumnos de ejemplo,
+la app los recupera automáticamente al abrirla.

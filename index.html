@@ -11,6 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect rx='20' width='100' height='100' fill='%231b3a4b'/><text y='68' x='50' text-anchor='middle' font-size='52' fill='%23e8c36a'>P</text></svg>" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
   <style>
     :root {
       --ink: #1b3a4b; --ink-2: #2c5364; --gold: #e8c36a; --cream: #f6f1e6;
@@ -406,7 +407,8 @@ function renderFicha(a){
         </div>
       </div>
       ${objs.length? `<p style="margin:10px 0 0">${objs.map(o=>`<span class="chip">${esc(o)}</span>`).join("")}</p>`:""}
-      ${a.notas? `<p class="hint">${esc(a.notas)}</p>`:""}
+      ${a.notas? `<p class="hint" style="white-space:pre-wrap">${esc(a.notas)}</p>`:""}
+      ${a.fichaArchivo? `<p class="hint">Ficha: ${esc(a.fichaArchivo)}</p>`:""}
       <div style="margin-top:12px" class="month-grid">
         ${p.meses.map(m => `<div class="mcell ${tieneMes(a.id,m)?"done":""}">${MES_LABEL[m]||m.slice(0,3)}</div>`).join("")}
       </div>
@@ -414,6 +416,11 @@ function renderFicha(a){
         <button class="btn primary" style="margin-top:0;flex:1" onclick="go('nueva',{alumno:'${a.id}'})">＋ Reunión</button>
         <button class="btn ghost" onclick="go('alumnoForm',{alumno:'${a.id}'})">Editar ficha</button>
       </div>
+      <div class="actions">
+        <button class="btn ghost" style="flex:1" type="button" onclick="document.getElementById('impDocx-${a.id}').click()">Importar ficha Word</button>
+      </div>
+      <input id="impDocx-${a.id}" type="file" accept=".docx,.txt" class="hidden" onchange="importarFichaWord(event, '${a.id}')" />
+      <p class="hint">Sube el .docx que tienes en Drive (o descarga y sube). Se leerán las notas familiares y las entradas con fecha.</p>
     </div>
     <h2 class="sec">Historial</h2>
     ${rs.length? rs.map(r => `
@@ -487,6 +494,108 @@ function borrarAlumno(id){
   const p = P();
   p.alumnos = p.alumnos.map(a => a.id==id ? {...a, activo:false} : a);
   save(); toast("Alumno dado de baja"); go("alumnos");
+}
+
+async function importarFichaWord(ev, alumnoId){
+  const file = ev.target.files[0];
+  if(!file) return;
+  toast("Leyendo ficha…");
+  try {
+    let text = "";
+    if (file.name.toLowerCase().endsWith(".docx")) {
+      if (typeof mammoth === "undefined") { toast("No se pudo cargar el lector de Word"); return; }
+      const arr = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({arrayBuffer: arr});
+      text = result.value || "";
+    } else {
+      text = await file.text();
+    }
+    text = text.replace(/\r/g, "").trim();
+    if (!text) { toast("El archivo está vacío"); return; }
+    aplicarFicha(alumnoId, text, file.name);
+  } catch(e) {
+    console.error(e);
+    toast("No se pudo leer el archivo");
+  }
+  ev.target.value = "";
+}
+
+function aplicarFicha(alumnoId, text, filename){
+  const p = P();
+  const a = p.alumnos.find(x => x.id == alumnoId);
+  if (!a) return;
+
+  const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+  let nac = a.nac || "";
+  const family = [];
+  const meetings = [];
+  let current = null;
+
+  const dateRe = /^(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?\s*$/;
+  const birthRe = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})\b/;
+
+  for (const line of lines) {
+    const dm = line.match(dateRe);
+    if (dm) {
+      if (current) meetings.push(current);
+      const day = dm[1].padStart(2,"0");
+      const mon = dm[2].padStart(2,"0");
+      let year = dm[3];
+      if (!year) year = new Date().getFullYear().toString();
+      else if (year.length === 2) year = "20" + year;
+      current = { fecha: `${year}-${mon}-${day}`, temas: "" };
+      continue;
+    }
+    if (!nac) {
+      const bm = line.match(birthRe);
+      if (bm && !current) {
+        const y = bm[3], m = bm[2].padStart(2,"0"), d = bm[1].padStart(2,"0");
+        nac = `${y}-${m}-${d}`;
+        continue;
+      }
+    }
+    if (current) {
+      current.temas += (current.temas ? "\n" : "") + line;
+    } else {
+      if (!/^\d{6,}$/.test(line) && !/^https?:\/\//i.test(line) && line.length > 2) {
+        family.push(line);
+      }
+    }
+  }
+  if (current) meetings.push(current);
+
+  if (nac) a.nac = nac;
+  if (family.length) {
+    const extra = family.join("\n");
+    a.notas = a.notas ? (a.notas + "\n\n" + extra).trim() : extra;
+  }
+  a.fichaArchivo = filename;
+  a.fichaTexto = text.slice(0, 8000);
+
+  let added = 0;
+  meetings.forEach(m => {
+    if (!m.temas.trim()) return;
+    const exists = (p.reuniones||[]).some(r => r.alumnoId == a.id && r.fecha === m.fecha && (r.temas||"").includes(m.temas.slice(0,40)));
+    if (exists) return;
+    p.reuniones.push({
+      id: uid(),
+      alumnoId: a.id,
+      fecha: m.fecha,
+      hora: "",
+      preceptor: a.defaultPreceptor || p.preceptorActivo || p.iniciales,
+      tipo: "individual",
+      asistentes: "Alumno",
+      temas: m.temas.trim(),
+      acuerdos: "",
+      notas: "Importado de " + filename,
+      auto: true
+    });
+    added++;
+  });
+
+  save();
+  toast(added ? `Ficha importada · ${added} reunión${added===1?"":"es"}` : "Ficha importada (sin reuniones nuevas)");
+  go("ficha", {alumno: a.id});
 }
 
 function tipoLabel(id){

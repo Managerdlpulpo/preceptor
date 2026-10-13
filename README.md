@@ -9,22 +9,33 @@ App web móvil para que cada profesor gestione su lista de preceptuados y regist
 3. Añade alumnos o importa un Excel/CSV.
 4. Registra reuniones. Todo se guarda solo en la memoria del navegador de ese dispositivo.
 
-## GitHub Pages
+## Publicación
 
 Repositorio: https://github.com/Managerdlpulpo/preceptor
 
-Para publicar:
+Dominio: **https://andelmanager.es**
 
-1. Ve a **Settings → Pages**.
+### DNS (PiensaSolutions)
+
+En el panel DNS de andelmanager.es crea:
+
+| Tipo  | Host / Nombre | Valor / Destino              |
+|-------|---------------|------------------------------|
+| CNAME | @             | managerdlpulpo.github.io     |
+| CNAME | www           | managerdlpulpo.github.io     |
+
+Si el panel no deja CNAME en `@`, usa un registro A con las IPs de GitHub Pages:
+
+- 185.199.108.153
+- 185.199.109.153
+- 185.199.110.153
+- 185.199.111.153
+
+Y un CNAME `www` → `managerdlpulpo.github.io`.
+
+### GitHub Pages
+
+1. Settings → Pages.
 2. Source: Deploy from branch → `main` / `/ (root)`.
-3. Save.
-
-La URL será: `https://managerdlpulpo.github.io/preceptor/`
-
-### Dominio propio
-
-1. En el mismo Settings → Pages, Custom domain: escribe tu dominio (ej. `preceptor.tudominio.es`).
-2. En el DNS de tu dominio crea un registro **CNAME** que apunte a `managerdlpulpo.github.io`.
-3. Espera unos minutos y marca "Enforce HTTPS".
-
-Los datos siguen guardándose solo en el navegador de cada usuario (no hay servidor de base de datos).
+3. Custom domain: `andelmanager.es` (el archivo CNAME ya está en el repo).
+4. Marca **Enforce HTTPS** cuando esté disponible.

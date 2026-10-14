@@ -582,6 +582,7 @@ function sugerirTema(){
   const pick = pool[Math.floor(Math.random()*pool.length)];
   usarTema(pick.titulo);
 }
+function renderHome(){
   const p = P();
   const list = alumnos();
   if (!list.length) {

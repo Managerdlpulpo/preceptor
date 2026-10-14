@@ -513,24 +513,35 @@ const TEMAS = [
 function renderTemas(){
   const dims = [...new Set(TEMAS.map(t=>t.dim))];
   const filtro = view.dimFiltro || "Todos";
-  const lista = filtro==="Todos" ? TEMAS : TEMAS.filter(t=>t.dim===filtro);
+  const sid = view.alumnoTemas || "";
+  const alumno = sid ? allAlumnos().find(x=>x.id==sid) : null;
+  const lista = (filtro==="Todos" ? TEMAS : TEMAS.filter(t=>t.dim===filtro))
+    .map(t => ({...t, hecho: alumno ? yaTratado(alumno, t.titulo) : false}))
+    .sort((a,b) => (a.hecho===b.hecho?0:a.hecho?1:-1));
+  const tratados = alumno ? temasTratados(alumno).length : 0;
   return `
-    <p class="hint" style="margin-top:0">Propuestas de conversación para ayudar a cada alumno a crecer en todas sus dimensiones. Pulsa un tema para ver las preguntas.</p>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+    <p class="hint" style="margin-top:0">Propuestas de conversación. Si eliges un alumno, se marcan los temas que ya habéis tratado y se priorizan los nuevos.</p>
+    <label>Ver para el alumno</label>
+    <select onchange="view.alumnoTemas=this.value; render()">
+      <option value="">Todos los temas (sin marcar)</option>
+      ${alumnos().map(a=>`<option value="${a.id}" ${a.id==sid?"selected":""}>${esc(full(a))}</option>`).join("")}
+    </select>
+    ${alumno? `<p class="hint">${tratados} de ${TEMAS.length} temas ya tratados con ${esc(full(alumno))}.</p>
+      <button class="btn primary" style="margin-top:6px" onclick="sugerirTema()">Sugerir un tema nuevo</button>`:""}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0">
       <button class="btn small ${filtro==='Todos'?'primary':''}" style="width:auto;margin:0" onclick="view.dimFiltro='Todos'; render()">Todos</button>
       ${dims.map(d=>`<button class="btn small ${filtro===d?'primary':''}" style="width:auto;margin:0" onclick="view.dimFiltro='${d}'; render()">${d}</button>`).join("")}
     </div>
-    ${lista.map((t,i)=>`
-      <div class="card" style="border-left:4px solid ${t.color}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-          <div>
-            <span class="chip" style="background:${t.color}22;color:${t.color}">${t.dim}</span>
-            <h3 style="margin:6px 0 4px;font-size:1.05rem">${esc(t.titulo)}</h3>
-            <p class="hint" style="margin:0">${esc(t.intent)}</p>
-          </div>
+    ${lista.map(t=>`
+      <div class="card" style="border-left:4px solid ${t.color};${t.hecho?'opacity:.72':''}">
+        <div>
+          <span class="chip" style="background:${t.color}22;color:${t.color}">${t.dim}</span>
+          ${t.hecho? `<span class="badge ok">Ya tratado</span>`:""}
+          <h3 style="margin:6px 0 4px;font-size:1.05rem">${esc(t.titulo)}</h3>
+          <p class="hint" style="margin:0">${esc(t.intent)}</p>
         </div>
         <details style="margin-top:10px">
-          <summary style="cursor:pointer;font-weight:600;color:var(--ink)">Ver preguntas para la conversación</summary>
+          <summary style="cursor:pointer;font-weight:600;color:var(--ink)">Ver preguntas</summary>
           <ol style="margin:8px 0 0;padding-left:18px">
             ${t.preguntas.map(q=>`<li style="margin:6px 0">${esc(q)}</li>`).join("")}
           </ol>
@@ -540,11 +551,36 @@ function renderTemas(){
     `).join("")}
   `;
 }
+function temasTratados(a){ return a.temasTratados || []; }
+function yaTratado(a, titulo){ return temasTratados(a).some(t => t.titulo === titulo); }
+function marcarTema(alumnoId, titulo, fecha, reunionId){
+  const a = P().alumnos.find(x => x.id == alumnoId);
+  if (!a || !titulo) return;
+  a.temasTratados = a.temasTratados || [];
+  if (a.temasTratados.some(t => t.titulo === titulo && t.reunionId === reunionId)) return;
+  a.temasTratados.push({titulo, fecha: fecha || new Date().toISOString().slice(0,10), reunionId: reunionId || null});
+}
+function detectarTema(texto){
+  if (!texto) return null;
+  const first = texto.split("\n")[0].trim();
+  return TEMAS.find(t => t.titulo === first || texto.startsWith(t.titulo))?.titulo || null;
+}
+
 function usarTema(titulo){
   const t = TEMAS.find(x=>x.titulo===titulo);
   if(!t) return;
   view.temaPrefill = t.titulo + "\n\n" + t.preguntas.map((q,i)=>(i+1)+". "+q).join("\n");
+  view.temaUsado = t.titulo;
+  if (view.alumnoTemas) view.alumno = view.alumnoTemas;
   go("nueva");
+}
+function sugerirTema(){
+  const id = view.alumnoTemas;
+  const a = id ? allAlumnos().find(x=>x.id==id) : null;
+  const pendientes = TEMAS.filter(t => !a || !yaTratado(a, t.titulo));
+  const pool = pendientes.length ? pendientes : TEMAS;
+  const pick = pool[Math.floor(Math.random()*pool.length)];
+  usarTema(pick.titulo);
 }
   const p = P();
   const list = alumnos();
@@ -646,6 +682,12 @@ function renderFicha(a){
       ${objs.length? `<p style="margin:10px 0 0">${objs.map(o=>`<span class="chip">${esc(o)}</span>`).join("")}</p>`:""}
       ${a.notas? `<p class="hint" style="white-space:pre-wrap">${esc(a.notas)}</p>`:""}
       ${a.fichaArchivo? `<p class="hint">Ficha: ${esc(a.fichaArchivo)}</p>`:""}
+      <div style="margin-top:12px">
+        <h2 class="sec" style="margin-bottom:6px">Temas de interés tratados</h2>
+        ${temasTratados(a).length
+          ? temasTratados(a).slice().reverse().map(t=>`<span class="chip">${esc(t.titulo)} <small>· ${fmt(t.fecha)}</small></span>`).join("")
+          : `<p class="hint" style="margin:0">Aún no hay temas marcados. Usa la pestaña Temas o registra una reunión con un tema.</p>`}
+      </div>
       <div style="margin-top:12px" class="month-grid">
         ${p.meses.map(m => `<div class="mcell ${tieneMes(a.id,m)?"done":""}">${MES_LABEL[m]||m.slice(0,3)}</div>`).join("")}
       </div>
@@ -905,6 +947,9 @@ function guardarReunion(ev, id){
   const p = P();
   if (id) p.reuniones = p.reuniones.map(r => r.id===id? {...r,...data}: r);
   else p.reuniones.push(data);
+  const tituloTema = view.temaUsado || detectarTema(data.temas);
+  if (tituloTema) marcarTema(data.alumnoId, tituloTema, data.fecha, data.id);
+  view.temaUsado = null;
   save(); toast(id?"Reunión actualizada":"Reunión registrada");
   go("ficha", {alumno: data.alumnoId});
 }

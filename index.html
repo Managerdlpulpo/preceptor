@@ -48,11 +48,7 @@
     .badge { font-size: .7rem; padding: 4px 8px; border-radius: 999px; background: #efe6d2; color: var(--ink); font-weight: 600; white-space: nowrap; }
     .badge.ok { background: #d9efe4; color: var(--ok); }
     .badge.warn { background: #f8e2d6; color: var(--warn); }
-    nav.tabbar {
-      position: fixed; left: 0; right: 0; bottom: 0; background: #fff;
-      border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(4, 1fr);
-      padding: 8px 6px calc(8px + env(safe-area-inset-bottom)); z-index: 30;
-    }
+    nav.tabbar { display: grid; grid-template-columns: repeat(5, 1fr); }
     nav.tabbar button { border: 0; background: none; color: var(--muted); font-size: .72rem; padding: 6px; }
     nav.tabbar button.on { color: var(--ink); font-weight: 700; }
     nav.tabbar button span { display: block; font-size: 1.15rem; }
@@ -90,6 +86,7 @@
   <nav class="tabbar" id="tabs">
     <button class="on" data-tab="home" onclick="go('home')"><span>🏠</span>Inicio</button>
     <button data-tab="alumnos" onclick="go('alumnos')"><span>👥</span>Alumnos</button>
+    <button data-tab="temas" onclick="go('temas')"><span>💬</span>Temas</button>
     <button data-tab="nueva" onclick="go('nueva')"><span>＋</span>Reunión</button>
     <button data-tab="ajustes" onclick="go('ajustes')"><span>⚙</span>Ajustes</button>
   </nav>
@@ -255,6 +252,7 @@ function render(){
     hdr.innerHTML = `<h1>${esc(p.nombre || "Preceptor")}</h1><p>${esc([p.iniciales, p.cursoEscolar, p.centro].filter(Boolean).join(" · "))}</p>`;
     if (view.tab==="home") el.innerHTML = renderHome();
     if (view.tab==="alumnos") el.innerHTML = renderAlumnos();
+    if (view.tab==="temas") el.innerHTML = renderTemas();
     if (view.tab==="nueva") el.innerHTML = renderForm();
     if (view.tab==="ajustes") el.innerHTML = renderAjustes();
   }
@@ -349,7 +347,205 @@ function textoDesde(iso){
   return Math.floor(d/365) + " año" + (Math.floor(d/365)>1?"s":"");
 }
 
-function renderHome(){
+const TEMAS = [
+  {dim:"Familia", color:"#3b82f6", titulo:"Cada uno en casa cuenta",
+   intent:"Descubrir el lugar único de cada miembro de la familia y cómo se cuidan.",
+   preguntas:[
+     "¿Quiénes viven en tu casa? Cuéntame algo que solo hace cada uno.",
+     "¿Qué es lo que más te gusta de estar en casa?",
+     "¿Hay algún momento del día en el que os reunís todos? ¿Qué pasa ahí?",
+     "Si tuvieras un superpoder para ayudar a alguien de tu familia, ¿a quién y cómo?"
+   ]},
+  {dim:"Familia", color:"#3b82f6", titulo:"Déjame crecer",
+   intent:"Hablar de la autonomía, la confianza de los padres y el deseo de ser mayor.",
+   preguntas:[
+     "¿Qué cosas ya puedes hacer solo que antes no podías?",
+     "¿Hay algo que te gustaría hacer y aún te dicen que esperes? ¿Por qué crees que es así?",
+     "¿Qué significa para ti 'ser responsable'?",
+     "¿Cómo te sientes cuando tus padres confían en ti?"
+   ]},
+  {dim:"Familia", color:"#3b82f6", titulo:"Gracias por estar siempre",
+   intent:"Cultivar el agradecimiento concreto hacia la familia.",
+   preguntas:[
+     "Piensa en alguien de tu familia que siempre está cuando lo necesitas. ¿Quién es y qué hace?",
+     "¿Qué es lo último que te han hecho y te ha hecho sentir querido?",
+     "Si pudieras decirle 'gracias' a tu familia por una sola cosa, ¿cuál sería?",
+     "¿Cómo puedes tú también estar para ellos esta semana?"
+   ]},
+  {dim:"Familia", color:"#3b82f6", titulo:"Gracias, perdón y ayúdame más",
+   intent:"Practicar las tres palabras que reparan y fortalecen las relaciones.",
+   preguntas:[
+     "¿Cuándo fue la última vez que dijiste 'gracias' de verdad?",
+     "¿Te cuesta pedir perdón? ¿Qué pasa dentro de ti cuando lo haces?",
+     "¿A quién le pedirías ayuda si algo te sale mal? ¿Por qué a esa persona?",
+     "Elige una de las tres frases y prueba a decirla hoy. ¿A quién se la dirías?"
+   ]},
+  {dim:"Familia", color:"#3b82f6", titulo:"Para quererle hay que tratarle",
+   intent:"Entender que el cariño se demuestra con hechos y trato diario.",
+   preguntas:[
+     "¿Cómo se nota que alguien te quiere de verdad?",
+     "¿Qué haces tú para que los de casa se sientan bien contigo?",
+     "¿Hay alguna forma de tratar a los demás que no te gusta? ¿Por qué?",
+     "Piensa en un gesto pequeño que puedas hacer hoy por alguien de tu familia."
+   ]},
+  {dim:"Amistad", color:"#0ea5e9", titulo:"¿Sumas o restas?",
+   intent:"Reflexionar sobre las cualidades del buen amigo y el efecto que tenemos en los demás.",
+   preguntas:[
+     "¿Qué es para ti un buen amigo?",
+     "Cuando estás con tus amigos, ¿sueles animar o quejarte? Pon un ejemplo.",
+     "¿Alguna vez alguien te ha hecho sentir mejor solo con estar cerca? ¿Qué hizo?",
+     "¿Qué puedes hacer esta semana para 'sumar' en tu clase?"
+   ]},
+  {dim:"Amistad", color:"#0ea5e9", titulo:"Iguales pero diferentes",
+   intent:"Valorar la diversidad y aceptar que no todos somos iguales.",
+   preguntas:[
+     "¿En qué te pareces a tus amigos y en qué sois diferentes?",
+     "¿Hay alguien en clase que haga las cosas de otra manera y te llama la atención?",
+     "¿Qué pasa cuando no respetamos que alguien sea distinto?",
+     "¿Cómo podemos hacer que todos se sientan a gusto siendo como son?"
+   ]},
+  {dim:"Amistad", color:"#0ea5e9", titulo:"Palabras que salvan",
+   intent:"Tomar conciencia del poder de las palabras para construir o herir.",
+   preguntas:[
+     "¿Recuerdas una frase que alguien te dijo y te hizo sentir bien?",
+     "¿Y alguna que te dolió? ¿Qué sentiste?",
+     "¿Por qué a veces decimos cosas sin pensar?",
+     "Piensa en una palabra buena que puedas decirle hoy a alguien."
+   ]},
+  {dim:"Emociones", color:"#8b5cf6", titulo:"Ser firme sin dejar de ser amable",
+   intent:"Aprender a expresar lo que sentimos con claridad y respeto.",
+   preguntas:[
+     "¿Te cuesta decir que algo no te gusta? ¿Qué haces entonces?",
+     "¿Cómo se puede decir 'no' sin enfadarse ni herir?",
+     "Cuéntame una vez en la que expresaste lo que sentías y salió bien.",
+     "¿Qué emoción te cuesta más nombrar: alegría, tristeza, rabia, miedo...?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Lo grande empezó siendo pequeño",
+   intent:"Valorar el esfuerzo constante y los pequeños pasos.",
+   preguntas:[
+     "¿Qué cosa te costó mucho al principio y ahora se te da mejor?",
+     "¿Prefieres las cosas rápidas o las que llevan tiempo? ¿Por qué?",
+     "Piensa en un hábito pequeño que, si lo haces cada día, te haría mejor.",
+     "¿Quién conoces que haya conseguido algo grande poco a poco?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Menos es más: la sobriedad",
+   intent:"Reflexionar sobre el valor de lo esencial y no necesitar tanto.",
+   preguntas:[
+     "¿Tienes muchas cosas o pocas? ¿Cuáles usas de verdad?",
+     "¿Qué pasa cuando queremos todo y ahora mismo?",
+     "Cuéntame algo que te haga feliz y no se compre.",
+     "¿Hay algo de lo que podrías prescindir esta semana?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Semillas de hoy, frutos de mañana",
+   intent:"Conectar las decisiones de ahora con el tipo de persona que se quiere ser.",
+   preguntas:[
+     "¿Qué tipo de persona te gustaría ser cuando seas mayor?",
+     "¿Qué semilla estás plantando hoy con tus estudios o tu forma de tratar a los demás?",
+     "¿Hay algo que estés dejando para 'más adelante' y podrías empezar ya?",
+     "¿Quién te está ayudando a crecer?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Viaja sin salir de tu habitación",
+   intent:"Descubrir el valor de la lectura, la imaginación y el aprendizaje.",
+   preguntas:[
+     "¿Qué libro, película o historia te ha llevado a otro sitio?",
+     "¿Te gusta imaginar cómo viven otras personas o en otros países?",
+     "¿Qué te gustaría aprender que ahora no sabes?",
+     "¿Cómo puedes viajar un poco cada día sin moverte de casa?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Cada piedra en el camino, cuenta",
+   intent:"Aprender de las dificultades y no rendirse.",
+   preguntas:[
+     "¿Qué ha sido lo más difícil para ti este curso?",
+     "Cuando algo sale mal, ¿qué sueles hacer?",
+     "¿Alguna vez una dificultad te enseñó algo importante?",
+     "¿Quién te ayuda cuando el camino se pone cuesta arriba?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Deja que te ayuden a brillar",
+   intent:"Aceptar la ayuda y reconocer que no tenemos que hacerlo todo solos.",
+   preguntas:[
+     "¿Te cuesta pedir ayuda? ¿Por qué?",
+     "¿Quién te ha ayudado últimamente y cómo?",
+     "¿Cómo te sientes cuando alguien te ofrece su apoyo?",
+     "¿A quién podrías pedir ayuda esta semana?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Mi mejor versión",
+   intent:"Mirar las propias fortalezas y el deseo de mejorar.",
+   preguntas:[
+     "¿Qué es lo que mejor se te da?",
+     "¿En qué te gustaría mejorar este trimestre?",
+     "¿Cómo se nota cuando estás siendo tu mejor versión?",
+     "Elige una cosa pequeña para practicar esta semana."
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Sé tú mismo",
+   intent:"Fortalecer la identidad y la seguridad personal.",
+   preguntas:[
+     "¿Qué es lo que más te gusta de cómo eres?",
+     "¿Alguna vez has hecho algo solo porque lo hacían los demás? ¿Cómo te sentiste?",
+     "¿Qué dirías a alguien que tiene miedo de ser diferente?",
+     "¿Cómo puedes ser más tú mismo en el colegio?"
+   ]},
+  {dim:"Servicio", color:"#a855f7", titulo:"Servir a los demás es amar a Dios",
+   intent:"Conectar el servicio concreto con el amor a Dios y a los otros.",
+   preguntas:[
+     "¿Qué significa para ti ayudar a alguien?",
+     "Cuéntame la última vez que hiciste algo bueno por otra persona.",
+     "¿Por qué crees que servir a los demás nos hace mejores?",
+     "¿A quién podrías servir esta semana de forma sencilla?"
+   ]},
+  {dim:"Espiritualidad", color:"#a855f7", titulo:"Te conoce, te entiende, te abraza",
+   intent:"Hablar del amor incondicional de Dios de forma cercana.",
+   preguntas:[
+     "¿Cómo te imaginas que Dios te mira?",
+     "¿Hay algún momento en el que te hayas sentido muy acompañado?",
+     "¿Qué te consuela cuando algo sale mal?",
+     "Si Dios te abrazara ahora mismo, ¿qué le contarías?"
+   ]},
+  {dim:"Espiritualidad", color:"#a855f7", titulo:"Verano + sacramentos, corazón contento",
+   intent:"Relacionar el descanso, los sacramentos y la alegría interior.",
+   preguntas:[
+     "¿Qué te hace sentir el corazón contento?",
+     "¿Has recibido algún sacramento? ¿Qué recuerdas de ese momento?",
+     "¿Cómo puedes cuidar tu corazón durante las vacaciones o el fin de semana?",
+     "¿Qué puedes hacer para llegar al lunes con el corazón más alegre?"
+   ]}
+];
+
+function renderTemas(){
+  const dims = [...new Set(TEMAS.map(t=>t.dim))];
+  const filtro = view.dimFiltro || "Todos";
+  const lista = filtro==="Todos" ? TEMAS : TEMAS.filter(t=>t.dim===filtro);
+  return `
+    <p class="hint" style="margin-top:0">Propuestas de conversación para ayudar a cada alumno a crecer en todas sus dimensiones. Pulsa un tema para ver las preguntas.</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn small ${filtro==='Todos'?'primary':''}" style="width:auto;margin:0" onclick="view.dimFiltro='Todos'; render()">Todos</button>
+      ${dims.map(d=>`<button class="btn small ${filtro===d?'primary':''}" style="width:auto;margin:0" onclick="view.dimFiltro='${d}'; render()">${d}</button>`).join("")}
+    </div>
+    ${lista.map((t,i)=>`
+      <div class="card" style="border-left:4px solid ${t.color}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div>
+            <span class="chip" style="background:${t.color}22;color:${t.color}">${t.dim}</span>
+            <h3 style="margin:6px 0 4px;font-size:1.05rem">${esc(t.titulo)}</h3>
+            <p class="hint" style="margin:0">${esc(t.intent)}</p>
+          </div>
+        </div>
+        <details style="margin-top:10px">
+          <summary style="cursor:pointer;font-weight:600;color:var(--ink)">Ver preguntas para la conversación</summary>
+          <ol style="margin:8px 0 0;padding-left:18px">
+            ${t.preguntas.map(q=>`<li style="margin:6px 0">${esc(q)}</li>`).join("")}
+          </ol>
+          <button class="btn ghost small" style="margin-top:8px" onclick="usarTema('${esc(t.titulo).replace(/'/g,"\\'")}')">Usar en una reunión</button>
+        </details>
+      </div>
+    `).join("")}
+  `;
+}
+function usarTema(titulo){
+  const t = TEMAS.find(x=>x.titulo===titulo);
+  if(!t) return;
+  view.temaPrefill = t.titulo + "\n\n" + t.preguntas.map((q,i)=>(i+1)+". "+q).join("\n");
+  go("nueva");
+}
   const p = P();
   const list = alumnos();
   if (!list.length) {
@@ -655,8 +851,11 @@ function renderForm(id){
     hora: new Date().toTimeString().slice(0,5),
     preceptor: p.preceptorActivo || p.iniciales,
     tipo: (p.tiposReunion[0]||{}).id,
-    asistentes: "Alumno", temas:"", acuerdos:"", notas:""
+    asistentes: "Alumno",
+    temas: view.temaPrefill || "",
+    acuerdos: "", notas:""
   };
+  if (!id && view.temaPrefill) view.temaPrefill = "";
   return `
     <form class="card" onsubmit="guardarReunion(event,'${id||""}')">
       <label>Alumno</label>

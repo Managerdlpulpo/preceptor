@@ -1,4 +1,4 @@
-const CACHE = "preceptor-app-v4";
+const CACHE = "preceptor-app-v5";
 const ASSETS = ["./index.html", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (e) => {

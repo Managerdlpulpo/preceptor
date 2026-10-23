@@ -96,6 +96,18 @@
 const KEY = "preceptor-app-v2";
 const KEY_OLD = "preceptor-2627-v1";
 const MESES_DEF = ["septiembre","octubre","noviembre","diciembre","enero","febrero","marzo","abril","mayo","junio"];
+const SUBJECTS = [
+  "Lengua castellana",
+  "Matemáticas",
+  "Inglés",
+  "Natural Science",
+  "Social Science",
+  "Religión",
+  "Educación Física",
+  "Plástica",
+  "Música",
+  "Educación Cívica"
+];
 const MES_LABEL = {septiembre:"Sep",octubre:"Oct",noviembre:"Nov",diciembre:"Dic",enero:"Ene",febrero:"Feb",marzo:"Mar",abril:"Abr",mayo:"May",junio:"Jun",julio:"Jul",agosto:"Ago"};
 const TIPOS_DEF = [
   {id:"individual", label:"Individual (alumno)"},
@@ -172,7 +184,7 @@ function loadDB(){
         iniciales: o.settings?.preceptorActivo || "AMB",
         preceptores: ["AMB","JML"],
         preceptorActivo: o.settings?.preceptorActivo || "AMB",
-        alumnos: DEMO.map((d,i) => ({...d, id: i+1, defaultPreceptor: "AMB", objetivos: [], notas:"", notasEval:["","","","",""], activo:true})),
+        alumnos: DEMO.map((d,i) => ({...d, id: i+1, defaultPreceptor: "AMB", objetivos: [], notas:"", notasEval:{"1":{},"2":{},"3":{},"4":{},"5":{}}, activo:true})),
         reuniones: o.reuniones || []
       });
       return {version:2, currentProfileId: prof.id, profiles:[prof]};
@@ -314,7 +326,7 @@ function crearPerfilDemo(){
     preceptores: ["AMB","JML"],
     preceptorActivo: "AMB",
     cursoEscolar: "2026-2027",
-    alumnos: DEMO.map((d,i)=>({...d, id: uid(), defaultPreceptor:"AMB", objetivos:[], notas:"", notasEval:["","","","",""], activo:true}))
+    alumnos: DEMO.map((d,i)=>({...d, id: uid(), defaultPreceptor:"AMB", objetivos:[], notas:"", notasEval:{"1":{},"2":{},"3":{},"4":{},"5":{}}, activo:true}))
   });
   prof.reuniones = DEMO.map(d => {
     const a = prof.alumnos.find(x => x.nombre===d.nombre && x.apellidos===d.apellidos);
@@ -684,16 +696,29 @@ function renderFicha(a){
       ${a.notas? `<p class="hint" style="white-space:pre-wrap">${esc(a.notas)}</p>`:""}
       <div style="margin-top:14px">
         <h2 class="sec" style="margin-bottom:8px">Notas por evaluación</h2>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
-          ${[0,1,2,3,4].map(i => {
-            const val = (a.notasEval && a.notasEval[i]) || "";
-            return `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 4px;text-align:center">
-              <div style="font-size:.7rem;color:var(--muted)">Eval ${i+1}</div>
-              <div style="font-weight:700;font-size:1.05rem;margin-top:2px">${esc(val || "—")}</div>
-            </div>`;
-          }).join("")}
+        <div style="overflow-x:auto">
+          <table style="border-collapse:collapse;width:100%;font-size:.75rem;min-width:480px">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)">Asignatura</th>
+                ${[1,2,3,4,5].map(e => `<th style="padding:4px;border-bottom:1px solid var(--line)">Eval ${e}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${SUBJECTS.map(subj => {
+                const row = (a.notasEval || {});
+                return `<tr>
+                  <td style="padding:4px 6px;border-bottom:1px solid var(--line);font-weight:500">${esc(subj)}</td>
+                  ${[1,2,3,4,5].map(e => {
+                    const val = (row[e] && row[e][subj]) || "";
+                    return `<td style="text-align:center;padding:4px;border-bottom:1px solid var(--line)">${esc(val || "—")}</td>`;
+                  }).join("")}
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
         </div>
-        <p class="hint" style="margin-top:6px">Edita en la ficha o impórtalas desde Excel.</p>
+        <p class="hint" style="margin-top:6px">Edita en la ficha o impórtalas desde Excel. Educación Cívica solo aparece si tiene nota.</p>
       </div>
       ${a.fichaArchivo? `<p class="hint">Ficha: ${esc(a.fichaArchivo)}</p>`:""}
       <div style="margin-top:12px">
@@ -756,15 +781,29 @@ function renderAlumnoForm(id){
       `).join("") || `<p class="hint">Añade objetivos en Ajustes para asignarlos aquí.</p>`}
       <label>Notas del alumno</label>
       <textarea name="notas" placeholder="Contexto familiar, NEAE, observaciones…">${esc(a.notas||"")}</textarea>
-      <label style="margin-top:12px">Notas por evaluación (5)</label>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
-        ${[0,1,2,3,4].map(i => `
-          <div>
-            <label style="font-size:.75rem;margin-bottom:2px">Eval ${i+1}</label>
-            <input name="eval${i}" value="${esc((a.notasEval && a.notasEval[i]) || "")}" placeholder="—" />
-          </div>
-        `).join("")}
+      <label style="margin-top:12px">Notas por asignatura y evaluación</label>
+      <div style="overflow-x:auto;margin-top:6px">
+        <table style="border-collapse:collapse;width:100%;font-size:.72rem;min-width:520px">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:3px 4px">Asignatura</th>
+              ${[1,2,3,4,5].map(e => `<th style="padding:3px 2px">E${e}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${SUBJECTS.map(subj => `
+              <tr>
+                <td style="padding:3px 4px;font-weight:500">${esc(subj)}</td>
+                ${[1,2,3,4,5].map(e => {
+                  const val = (a.notasEval && a.notasEval[e] && a.notasEval[e][subj]) || "";
+                  return `<td style="padding:2px"><input name="n_${e}_${subj.replace(/ /g,"_")}" value="${esc(val)}" style="width:100%;padding:6px 4px;font-size:.85rem" placeholder="—" /></td>`;
+                }).join("")}
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
       </div>
+      <p class="hint">Deja en blanco las asignaturas que no curse (ej. Educación Cívica).</p>
       <button class="btn primary" type="submit">Guardar alumno</button>
       ${id? `<div class="actions"><button type="button" class="btn danger" style="flex:1" onclick="borrarAlumno('${id}')">Dar de baja</button></div>`:""}
     </form>`;
@@ -783,7 +822,17 @@ function guardarAlumno(ev, id){
     defaultPreceptor: f.defaultPreceptor.value,
     objetivos: [...f.querySelectorAll("[name=obj]:checked")].map(x=>x.value),
     notas: f.notas.value.trim(),
-    notasEval: [0,1,2,3,4].map(i => (f["eval"+i]?.value || "").trim()),
+    notasEval: (() => {
+      const ne = {"1":{},"2":{},"3":{},"4":{},"5":{}};
+      SUBJECTS.forEach(subj => {
+        [1,2,3,4,5].forEach(e => {
+          const key = "n_" + e + "_" + subj.replace(/ /g, "_");
+          const val = (f[key]?.value || "").trim();
+          if (val) ne[e][subj] = val;
+        });
+      });
+      return ne;
+    })(),
     activo: true
   };
   const p = P();
@@ -1197,21 +1246,31 @@ function importarNotas(ev){
           return af === fullName || af.includes(nombre.toLowerCase());
         });
         if(!alumno) return;
-        // Mapear evaluaciones
-        const evals = ["","","","",""];
-        for(let i=1; i<=5; i++){
-          const keys = [
-            "eval"+i, "evaluacion"+i, "eval "+i, "evaluación "+i,
-            i+"ª", i+"a", "nota"+i, "nota "+i, "e"+i
-          ];
-          for(const k of keys){
-            if(map[k] !== undefined && String(map[k]).trim()){
-              evals[i-1] = String(map[k]).trim();
-              break;
+        // Mapear notas por asignatura y evaluación
+        const ne = alumno.notasEval || {"1":{},"2":{},"3":{},"4":{},"5":{}};
+        ["1","2","3","4","5"].forEach(e => { if(!ne[e]) ne[e] = {}; });
+        SUBJECTS.forEach(subj => {
+          const subjNorm = subj.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/ /g,"");
+          [1,2,3,4,5].forEach(e => {
+            const keys = [
+              subjNorm + "eval" + e,
+              subjNorm + "e" + e,
+              subjNorm + e,
+              subj.toLowerCase().replace(/ /g,"_") + "_eval" + e,
+              subj.toLowerCase().replace(/ /g,"") + e,
+              // short aliases
+              (subj==="Lengua castellana"?"lengua":subj==="Matemáticas"?"mates":subj==="Inglés"?"ingles":subj==="Natural Science"?"natural":subj==="Social Science"?"social":subj==="Educación Física"?"ef":subj==="Educación Cívica"?"civica":subj.toLowerCase().slice(0,4)) + e
+            ];
+            for (const k of keys) {
+              const nk = norm(k);
+              if (map[nk] !== undefined && String(map[nk]).trim()) {
+                ne[e][subj] = String(map[nk]).trim();
+                break;
+              }
             }
-          }
-        }
-        alumno.notasEval = evals;
+          });
+        });
+        alumno.notasEval = ne;
         updated++;
       });
       save();

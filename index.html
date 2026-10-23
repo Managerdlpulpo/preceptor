@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="theme-color" content="#1b3a4b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Preceptor" />
+  <title>Preceptor</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect rx='20' width='100' height='100' fill='%231b3a4b'/><text y='68' x='50' text-anchor='middle' font-size='52' fill='%23e8c36a'>P</text></svg>" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+  <style>
+    :root {
+      --ink: #1b3a4b; --ink-2: #2c5364; --gold: #e8c36a; --cream: #f6f1e6;
+      --paper: #fffdf8; --line: #e4d9c5; --ok: #2f7d5a; --warn: #c45c26;
+      --muted: #6b7c86; --shadow: 0 10px 30px rgba(27,58,75,.12); --radius: 18px;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; background: var(--cream); color: var(--ink); font-family: "Segoe UI", system-ui, sans-serif; }
+    body { padding-bottom: 88px; min-height: 100dvh; }
+    header.app {
+      position: sticky; top: 0; z-index: 20;
+      background: linear-gradient(160deg, var(--ink), var(--ink-2));
+      color: #fff; padding: 16px 16px 14px; box-shadow: 0 8px 24px rgba(27,58,75,.25);
+    }
+    header.app h1 { margin: 0; font-size: 1.15rem; }
+    header.app p { margin: 4px 0 0; opacity: .8; font-size: .82rem; }
+    .wrap { padding: 14px; max-width: 760px; margin: 0 auto; }
+    .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+    .kpi { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 12px 8px; text-align: center; }
+    .kpi b { display: block; font-size: 1.25rem; }
+    .kpi span { font-size: .72rem; color: var(--muted); }
+    .search, input, select, textarea {
+      width: 100%; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line);
+      background: #fff; font-size: 1rem; font-family: inherit;
+    }
+    .search { background: var(--paper); margin-bottom: 12px; }
+    textarea { min-height: 88px; resize: vertical; }
+    .card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow); }
+    .student { display: flex; gap: 12px; align-items: center; cursor: pointer; }
+    .avatar { width: 46px; height: 46px; border-radius: 14px; background: var(--ink); color: var(--gold); display: grid; place-items: center; font-weight: 700; flex: none; }
+    .meta { flex: 1; min-width: 0; }
+    .meta h3 { margin: 0; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .meta small { color: var(--muted); }
+    .badge { font-size: .7rem; padding: 4px 8px; border-radius: 999px; background: #efe6d2; color: var(--ink); font-weight: 600; white-space: nowrap; }
+    .badge.ok { background: #d9efe4; color: var(--ok); }
+    .badge.warn { background: #f8e2d6; color: var(--warn); }
+    nav.tabbar { display: grid; grid-template-columns: repeat(5, 1fr); }
+    nav.tabbar button { border: 0; background: none; color: var(--muted); font-size: .72rem; padding: 6px; }
+    nav.tabbar button.on { color: var(--ink); font-weight: 700; }
+    nav.tabbar button span { display: block; font-size: 1.15rem; }
+    .hidden { display: none !important; }
+    h2.sec { font-size: 1.05rem; margin: 6px 0 10px; }
+    label { display: block; font-size: .8rem; color: var(--muted); margin: 10px 0 4px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 14px; padding: 12px 14px; font-weight: 700; cursor: pointer; font-size: .95rem; }
+    .btn.primary { background: var(--ink); color: #fff; width: 100%; margin-top: 12px; }
+    .btn.ghost { background: #efe6d2; color: var(--ink); }
+    .btn.danger { background: #f8e2d6; color: var(--warn); }
+    .btn.small { padding: 8px 10px; font-size: .82rem; border-radius: 10px; }
+    .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .month-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .mcell { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px 4px; text-align: center; font-size: .72rem; }
+    .mcell.done { background: #d9efe4; border-color: #b7dfc8; }
+    .hist { border-left: 3px solid var(--gold); padding-left: 10px; margin: 10px 0; }
+    .hist h4 { margin: 0 0 2px; font-size: .95rem; }
+    .toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 14px; border-radius: 999px; font-size: .85rem; z-index: 50; opacity: 0; pointer-events: none; transition: .25s; max-width: 90%; }
+    .toast.show { opacity: 1; }
+    .empty { text-align: center; color: var(--muted); padding: 24px 10px; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; background: #efe6d2; border-radius: 999px; padding: 6px 10px; font-size: .8rem; margin: 0 6px 6px 0; }
+    .chip button { border: 0; background: none; color: var(--warn); font-weight: 700; padding: 0; }
+    .check { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; font-size: .92rem; }
+    .check input { width: 18px; height: 18px; margin-top: 2px; flex: none; }
+    .back { background: none; border: 0; color: #fff; font-size: .9rem; padding: 0 0 8px; }
+    .hint { color: var(--muted); font-size: .85rem; margin: 6px 0 0; }
+    hr.sep { border: 0; border-top: 1px solid var(--line); margin: 10px 0; }
+    .wizard { max-width: 520px; margin: 24px auto; }
+  </style>
+</head>
+<body>
+  <header class="app" id="hdr"><h1>Preceptor</h1><p>Reuniones de tutoría</p></header>
+  <main class="wrap" id="app"></main>
+  <nav class="tabbar" id="tabs">
+    <button class="on" data-tab="home" onclick="go('home')"><span>🏠</span>Inicio</button>
+    <button data-tab="alumnos" onclick="go('alumnos')"><span>👥</span>Alumnos</button>
+    <button data-tab="temas" onclick="go('temas')"><span>💬</span>Temas</button>
+    <button data-tab="nueva" onclick="go('nueva')"><span>＋</span>Reunión</button>
+    <button data-tab="ajustes" onclick="go('ajustes')"><span>⚙</span>Ajustes</button>
+  </nav>
+  <div class="toast" id="toast"></div>
+
+<script>
+const KEY = "preceptor-app-v2";
+const KEY_OLD = "preceptor-2627-v1";
+const MESES_DEF = ["septiembre","octubre","noviembre","diciembre","enero","febrero","marzo","abril","mayo","junio"];
+const MES_LABEL = {septiembre:"Sep",octubre:"Oct",noviembre:"Nov",diciembre:"Dic",enero:"Ene",febrero:"Feb",marzo:"Mar",abril:"Abr",mayo:"May",junio:"Jun",julio:"Jul",agosto:"Ago"};
+const TIPOS_DEF = [
+  {id:"individual", label:"Individual (alumno)"},
+  {id:"familia", label:"Con familia"},
+  {id:"equipo", label:"Equipo docente"},
+  {id:"seguimiento", label:"Seguimiento"}
+];
+const OBJ_DEF = [
+  {id:"acad", titulo:"Seguimiento académico"},
+  {id:"hab", titulo:"Hábitos de estudio"},
+  {id:"conv", titulo:"Convivencia y clima"},
+  {id:"emo", titulo:"Bienestar emocional"},
+  {id:"fam", titulo:"Coordinación con la familia"}
+];
+const DEMO = [
+  {nombre:"Izan", apellidos:"Pérez Calvo", curso:"3 PRIM A", nac:"2018-03-12", primer:"2026-09-21"},
+  {nombre:"Leo", apellidos:"Herranz González", curso:"5 PRIM A", nac:"2016-05-08", primer:"2026-09-17"},
+  {nombre:"Iñaki", apellidos:"Caballero Ortiz", curso:"5 PRIM B", nac:"2016-01-02", primer:"2026-09-17"},
+  {nombre:"Pablo", apellidos:"Casado Romero", curso:"5 PRIM B", nac:"2016-03-09", primer:"2026-09-17"},
+  {nombre:"Rodrigo", apellidos:"Coello Martín", curso:"5 PRIM B", nac:"2016-10-08", primer:"2026-09-17"},
+  {nombre:"Rodrigo", apellidos:"Marcuello González", curso:"5 PRIM B", nac:"2016-03-09", primer:"2026-09-17"},
+  {nombre:"Íñigo", apellidos:"Campoy González", curso:"6 PRIM A", nac:"2015-09-09", primer:"2026-09-23"},
+  {nombre:"Lucas", apellidos:"García Dueñas", curso:"6 PRIM A", nac:"2015-09-08", primer:"2026-09-14"},
+  {nombre:"Erick Ditiane", apellidos:"Monteiro", curso:"6 PRIM A", nac:"2015-05-05", primer:"2026-09-24"},
+  {nombre:"Eduardo Javier", apellidos:"Rosero Andújar", curso:"6 PRIM A", nac:"2015-01-28", primer:"2026-09-24"},
+  {nombre:"Ricardo Henrique", apellidos:"Silva Costa", curso:"6 PRIM A", nac:"2015-11-12", primer:"2026-09-24"},
+  {nombre:"David", apellidos:"Arriero Chera", curso:"6 PRIM C", nac:"2015-07-08", primer:"2026-09-17"},
+  {nombre:"José Francisco", apellidos:"García Cánovas", curso:"6 PRIM C", nac:"2015-03-20", primer:"2026-09-17"},
+  {nombre:"Eduardo", apellidos:"López De Villanueva", curso:"6 PRIM C", nac:"2015-11-20", primer:"2026-09-17"},
+  {nombre:"Gonzalo", apellidos:"Marco Gonzalo", curso:"6 PRIM C", nac:"2015-09-03", primer:"2026-09-17"},
+  {nombre:"Pablo", apellidos:"Toril Fernández", curso:"6 PRIM C", nac:"2015-12-17", primer:"2026-09-23"}
+];
+
+let db = loadDB();
+let view = {tab:"home", alumno:null, reunion:null, q:"", setup:false};
+
+function uid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now())+Math.random(); }
+function P(){ return db.profiles.find(p => p.id === db.currentProfileId) || db.profiles[0]; }
+function alumnos(){ return (P().alumnos || []).filter(a => a.activo !== false); }
+function allAlumnos(){ return P().alumnos || []; }
+
+function newProfile(extra={}){
+  return {
+    id: uid(),
+    nombre: extra.nombre || "",
+    iniciales: extra.iniciales || "",
+    centro: extra.centro || "",
+    cursoEscolar: extra.cursoEscolar || "2026-2027",
+    meses: extra.meses || [...MESES_DEF],
+    preceptores: extra.preceptores || (extra.iniciales ? [extra.iniciales] : []),
+    preceptorActivo: extra.iniciales || "",
+    tiposReunion: extra.tiposReunion || JSON.parse(JSON.stringify(TIPOS_DEF)),
+    objetivosCatalogo: extra.objetivosCatalogo || JSON.parse(JSON.stringify(OBJ_DEF)),
+    metaMensual: extra.metaMensual ?? 1,
+    alumnos: extra.alumnos || [],
+    reuniones: extra.reuniones || []
+  };
+}
+
+function loadDB(){
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.profiles?.length) return parsed;
+    }
+  } catch(e) {}
+  try {
+    const old = localStorage.getItem(KEY_OLD);
+    if (old) {
+      const o = JSON.parse(old);
+      const prof = newProfile({
+        nombre: "Preceptor original",
+        iniciales: o.settings?.preceptorActivo || "AMB",
+        preceptores: ["AMB","JML"],
+        preceptorActivo: o.settings?.preceptorActivo || "AMB",
+        alumnos: DEMO.map((d,i) => ({...d, id: i+1, defaultPreceptor: "AMB", objetivos: [], notas:"", notasEval:["","","","",""], activo:true})),
+        reuniones: o.reuniones || []
+      });
+      return {version:2, currentProfileId: prof.id, profiles:[prof]};
+    }
+  } catch(e) {}
+  return {version:2, currentProfileId:null, profiles:[]};
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(db)); }
+
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2400);
+}
+function esc(s){ return String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+function full(a){ return `${a.nombre||""} ${a.apellidos||""}`.trim(); }
+function ini(a){
+  const n = (a.nombre||"?").trim()[0] || "?";
+  const p = (a.apellidos||"").trim()[0] || "";
+  return (n+p).toUpperCase();
+}
+function fmt(iso){
+  if(!iso) return "—";
+  const [y,m,d] = String(iso).split("-");
+  if(!d) return iso;
+  return `${d}/${m}/${y}`;
+}
+function mesDe(iso){
+  if(!iso) return null;
+  const d = new Date(iso+"T12:00:00");
+  if (isNaN(d)) return null;
+  return ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"][d.getMonth()];
+}
+function mesActual(){
+  const name = mesDe(new Date().toISOString().slice(0,10));
+  const meses = P()?.meses || MESES_DEF;
+  return meses.includes(name) ? name : meses[0];
+}
+function reunionesDe(id){ return (P().reuniones||[]).filter(r => r.alumnoId==id).sort((a,b)=> String(b.fecha).localeCompare(String(a.fecha))); }
+function tieneMes(id, mes){ return (P().reuniones||[]).some(r => r.alumnoId==id && mesDe(r.fecha)===mes); }
+
+function go(tab, extra={}){
+  view = {...view, tab, ...extra};
+  document.querySelectorAll("nav.tabbar button").forEach(b => b.classList.toggle("on", b.dataset.tab===tab ||
+    (tab==="ficha" && b.dataset.tab==="alumnos") ||
+    (tab==="alumnoForm" && b.dataset.tab==="alumnos") ||
+    (tab==="editar" && b.dataset.tab==="nueva")
+  ));
+  render();
+  window.scrollTo(0,0);
+}
+
+function render(){
+  const el = document.getElementById("app");
+  const hdr = document.getElementById("hdr");
+  const tabs = document.getElementById("tabs");
+  if (!db.profiles.length || view.setup) {
+    tabs.classList.add("hidden");
+    hdr.innerHTML = `<h1>Bienvenido</h1><p>Crea tu espacio de preceptuados</p>`;
+    el.innerHTML = renderSetup();
+    return;
+  }
+  tabs.classList.remove("hidden");
+  const p = P();
+  if (view.tab==="ficha") {
+    const a = allAlumnos().find(x=>x.id==view.alumno);
+    if(!a){ go("alumnos"); return; }
+    hdr.innerHTML = `<button class="back" onclick="go('alumnos')">← Alumnos</button><h1>${esc(full(a))}</h1><p>${esc(a.curso||"")}</p>`;
+    el.innerHTML = renderFicha(a);
+  } else if (view.tab==="alumnoForm") {
+    hdr.innerHTML = `<button class="back" onclick="go(view.alumno?'ficha':'alumnos',{alumno:view.alumno})">← Atrás</button><h1>${view.alumno?"Editar alumno":"Nuevo alumno"}</h1><p></p>`;
+    el.innerHTML = renderAlumnoForm(view.alumno);
+  } else if (view.tab==="editar") {
+    hdr.innerHTML = `<button class="back" onclick="go('ficha',{alumno:view.alumno})">← Ficha</button><h1>Editar reunión</h1><p></p>`;
+    el.innerHTML = renderForm(view.reunion);
+  } else {
+    hdr.innerHTML = `<h1>${esc(p.nombre || "Preceptor")}</h1><p>${esc([p.iniciales, p.cursoEscolar, p.centro].filter(Boolean).join(" · "))}</p>`;
+    if (view.tab==="home") el.innerHTML = renderHome();
+    if (view.tab==="alumnos") el.innerHTML = renderAlumnos();
+    if (view.tab==="temas") el.innerHTML = renderTemas();
+    if (view.tab==="nueva") el.innerHTML = renderForm();
+    if (view.tab==="ajustes") el.innerHTML = renderAjustes();
+  }
+}
+
+function renderSetup(){
+  return `
+    <div class="wizard">
+      <div class="card">
+        <h2 class="sec">Tu perfil de profesor</h2>
+        <p class="hint">Cada profesor puede tener su propia lista de preceptuados en este mismo dispositivo.</p>
+        <form onsubmit="crearPerfil(event)">
+          <label>Nombre</label>
+          <input name="nombre" required placeholder="Ana Martínez Blanco" />
+          <div class="row2">
+            <div><label>Iniciales</label><input name="iniciales" required placeholder="AMB" maxlength="8" /></div>
+            <div><label>Curso escolar</label><input name="cursoEscolar" value="2026-2027" /></div>
+          </div>
+          <label>Centro (opcional)</label>
+          <input name="centro" placeholder="Colegio…" />
+          <label>Otros preceptores del equipo (separados por coma)</label>
+          <input name="otros" placeholder="JML, LPG" />
+          <button class="btn primary" type="submit">Crear mi lista vacía</button>
+        </form>
+        <div class="actions">
+          <button class="btn ghost" style="flex:1" type="button" onclick="crearPerfilDemo()">Empezar con el ejemplo 26/27</button>
+        </div>
+        <p class="hint">El ejemplo carga los 16 alumnos del archivo original. Luego puedes borrar, editar o añadir.</p>
+      </div>
+      <div class="card">
+        <h2 class="sec">¿Ya tienes copia de seguridad?</h2>
+        <button class="btn ghost" style="width:100%" type="button" onclick="document.getElementById('imp0').click()">Restaurar JSON</button>
+        <input id="imp0" type="file" accept="application/json" class="hidden" onchange="importarJSON(event)" />
+      </div>
+    </div>`;
+}
+
+function crearPerfil(ev){
+  ev.preventDefault();
+  const f = ev.target;
+  const iniciales = f.iniciales.value.trim().toUpperCase();
+  const otros = f.otros.value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
+  const preceptores = [...new Set([iniciales, ...otros])];
+  const prof = newProfile({
+    nombre: f.nombre.value.trim(),
+    iniciales, centro: f.centro.value.trim(),
+    cursoEscolar: f.cursoEscolar.value.trim() || "2026-2027",
+    preceptores, preceptorActivo: iniciales
+  });
+  db.profiles.push(prof);
+  db.currentProfileId = prof.id;
+  view.setup = false;
+  save(); toast("Perfil creado"); go("alumnos");
+}
+function crearPerfilDemo(){
+  const prof = newProfile({
+    nombre: "Preceptor ejemplo",
+    iniciales: "AMB",
+    preceptores: ["AMB","JML"],
+    preceptorActivo: "AMB",
+    cursoEscolar: "2026-2027",
+    alumnos: DEMO.map((d,i)=>({...d, id: uid(), defaultPreceptor:"AMB", objetivos:[], notas:"", notasEval:["","","","",""], activo:true}))
+  });
+  prof.reuniones = DEMO.map(d => {
+    const a = prof.alumnos.find(x => x.nombre===d.nombre && x.apellidos===d.apellidos);
+    return {id:uid(), alumnoId:a.id, fecha:d.primer, hora:"09:00", preceptor:"AMB", tipo:"individual", asistentes:"Alumno", temas:"Primera tutoría del curso", acuerdos:"", notas:"Cargada del ejemplo.", auto:true};
+  });
+  db.profiles.push(prof);
+  db.currentProfileId = prof.id;
+  view.setup = false;
+  save(); toast("Ejemplo cargado"); go("home");
+}
+
+function ultimaReunion(id){
+  const rs = reunionesDe(id);
+  return rs.length ? rs[0].fecha : null;
+}
+function diasDesde(iso){
+  if(!iso) return 9999;
+  const d = new Date(iso + "T12:00:00");
+  if(isNaN(d)) return 9999;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+function textoDesde(iso){
+  if(!iso) return "Nunca";
+  const d = diasDesde(iso);
+  if(d < 0) return "futura";
+  if(d === 0) return "hoy";
+  if(d === 1) return "ayer";
+  if(d < 30) return d + " días";
+  if(d < 365) return Math.floor(d/30) + " mes" + (Math.floor(d/30)>1?"es":"");
+  return Math.floor(d/365) + " año" + (Math.floor(d/365)>1?"s":"");
+}
+
+const TEMAS = [
+  {dim:"Familia", color:"#3b82f6", titulo:"Cada uno en casa cuenta",
+   intent:"Descubrir el lugar único de cada miembro de la familia y cómo se cuidan.",
+   preguntas:[
+     "¿Quiénes viven en tu casa? Cuéntame algo que solo hace cada uno.",
+     "¿Qué es lo que más te gusta de estar en casa?",
+     "¿Hay algún momento del día en el que os reunís todos? ¿Qué pasa ahí?",
+     "Si tuvieras un superpoder para ayudar a alguien de tu familia, ¿a quién y cómo?"
+   ]},
+  {dim:"Familia", color:"#3b82f6", titulo:"Déjame crecer",
+   intent:"Hablar de la autonomía, la confianza de los padres y el deseo de ser mayor.",
+   preguntas:[
+     "¿Qué cosas ya puedes hacer solo que antes no podías?",
+     "¿Hay algo que te gustaría hacer y aún te dicen que esperes? ¿Por qué crees que es así?",
+     "¿Qué significa para ti 'ser responsable'?",
+     "¿Cómo te sientes cuando tus padres confían en ti?"
+   ]},
+  {dim:"Familia", color:"#3b82f6", titulo:"Gracias por estar siempre",
+   intent:"Cultivar el agradecimiento concreto hacia la familia.",
+   preguntas:[
+     "Piensa en alguien de tu familia que siempre está cuando lo necesitas. ¿Quién es y qué hace?",
+     "¿Qué es lo último que te han hecho y te ha hecho sentir querido?",
+     "Si pudieras decirle 'gracias' a tu familia por una sola cosa, ¿cuál sería?",
+     "¿Cómo puedes tú también estar para ellos esta semana?"
+   ]},
+  {dim:"Familia", color:"#3b82f6", titulo:"Gracias, perdón y ayúdame más",
+   intent:"Practicar las tres palabras que reparan y fortalecen las relaciones.",
+   preguntas:[
+     "¿Cuándo fue la última vez que dijiste 'gracias' de verdad?",
+     "¿Te cuesta pedir perdón? ¿Qué pasa dentro de ti cuando lo haces?",
+     "¿A quién le pedirías ayuda si algo te sale mal? ¿Por qué a esa persona?",
+     "Elige una de las tres frases y prueba a decirla hoy. ¿A quién se la dirías?"
+   ]},
+  {dim:"Familia", color:"#3b82f6", titulo:"Para quererle hay que tratarle",
+   intent:"Entender que el cariño se demuestra con hechos y trato diario.",
+   preguntas:[
+     "¿Cómo se nota que alguien te quiere de verdad?",
+     "¿Qué haces tú para que los de casa se sientan bien contigo?",
+     "¿Hay alguna forma de tratar a los demás que no te gusta? ¿Por qué?",
+     "Piensa en un gesto pequeño que puedas hacer hoy por alguien de tu familia."
+   ]},
+  {dim:"Amistad", color:"#0ea5e9", titulo:"¿Sumas o restas?",
+   intent:"Reflexionar sobre las cualidades del buen amigo y el efecto que tenemos en los demás.",
+   preguntas:[
+     "¿Qué es para ti un buen amigo?",
+     "Cuando estás con tus amigos, ¿sueles animar o quejarte? Pon un ejemplo.",
+     "¿Alguna vez alguien te ha hecho sentir mejor solo con estar cerca? ¿Qué hizo?",
+     "¿Qué puedes hacer esta semana para 'sumar' en tu clase?"
+   ]},
+  {dim:"Amistad", color:"#0ea5e9", titulo:"Iguales pero diferentes",
+   intent:"Valorar la diversidad y aceptar que no todos somos iguales.",
+   preguntas:[
+     "¿En qué te pareces a tus amigos y en qué sois diferentes?",
+     "¿Hay alguien en clase que haga las cosas de otra manera y te llama la atención?",
+     "¿Qué pasa cuando no respetamos que alguien sea distinto?",
+     "¿Cómo podemos hacer que todos se sientan a gusto siendo como son?"
+   ]},
+  {dim:"Amistad", color:"#0ea5e9", titulo:"Palabras que salvan",
+   intent:"Tomar conciencia del poder de las palabras para construir o herir.",
+   preguntas:[
+     "¿Recuerdas una frase que alguien te dijo y te hizo sentir bien?",
+     "¿Y alguna que te dolió? ¿Qué sentiste?",
+     "¿Por qué a veces decimos cosas sin pensar?",
+     "Piensa en una palabra buena que puedas decirle hoy a alguien."
+   ]},
+  {dim:"Emociones", color:"#8b5cf6", titulo:"Ser firme sin dejar de ser amable",
+   intent:"Aprender a expresar lo que sentimos con claridad y respeto.",
+   preguntas:[
+     "¿Te cuesta decir que algo no te gusta? ¿Qué haces entonces?",
+     "¿Cómo se puede decir 'no' sin enfadarse ni herir?",
+     "Cuéntame una vez en la que expresaste lo que sentías y salió bien.",
+     "¿Qué emoción te cuesta más nombrar: alegría, tristeza, rabia, miedo...?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Lo grande empezó siendo pequeño",
+   intent:"Valorar el esfuerzo constante y los pequeños pasos.",
+   preguntas:[
+     "¿Qué cosa te costó mucho al principio y ahora se te da mejor?",
+     "¿Prefieres las cosas rápidas o las que llevan tiempo? ¿Por qué?",
+     "Piensa en un hábito pequeño que, si lo haces cada día, te haría mejor.",
+     "¿Quién conoces que haya conseguido algo grande poco a poco?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Menos es más: la sobriedad",
+   intent:"Reflexionar sobre el valor de lo esencial y no necesitar tanto.",
+   preguntas:[
+     "¿Tienes muchas cosas o pocas? ¿Cuáles usas de verdad?",
+     "¿Qué pasa cuando queremos todo y ahora mismo?",
+     "Cuéntame algo que te haga feliz y no se compre.",
+     "¿Hay algo de lo que podrías prescindir esta semana?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Semillas de hoy, frutos de mañana",
+   intent:"Conectar las decisiones de ahora con el tipo de persona que se quiere ser.",
+   preguntas:[
+     "¿Qué tipo de persona te gustaría ser cuando seas mayor?",
+     "¿Qué semilla estás plantando hoy con tus estudios o tu forma de tratar a los demás?",
+     "¿Hay algo que estés dejando para 'más adelante' y podrías empezar ya?",
+     "¿Quién te está ayudando a crecer?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Viaja sin salir de tu habitación",
+   intent:"Descubrir el valor de la lectura, la imaginación y el aprendizaje.",
+   preguntas:[
+     "¿Qué libro, película o historia te ha llevado a otro sitio?",
+     "¿Te gusta imaginar cómo viven otras personas o en otros países?",
+     "¿Qué te gustaría aprender que ahora no sabes?",
+     "¿Cómo puedes viajar un poco cada día sin moverte de casa?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Cada piedra en el camino, cuenta",
+   intent:"Aprender de las dificultades y no rendirse.",
+   preguntas:[
+     "¿Qué ha sido lo más difícil para ti este curso?",
+     "Cuando algo sale mal, ¿qué sueles hacer?",
+     "¿Alguna vez una dificultad te enseñó algo importante?",
+     "¿Quién te ayuda cuando el camino se pone cuesta arriba?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Deja que te ayuden a brillar",
+   intent:"Aceptar la ayuda y reconocer que no tenemos que hacerlo todo solos.",
+   preguntas:[
+     "¿Te cuesta pedir ayuda? ¿Por qué?",
+     "¿Quién te ha ayudado últimamente y cómo?",
+     "¿Cómo te sientes cuando alguien te ofrece su apoyo?",
+     "¿A quién podrías pedir ayuda esta semana?"
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Mi mejor versión",
+   intent:"Mirar las propias fortalezas y el deseo de mejorar.",
+   preguntas:[
+     "¿Qué es lo que mejor se te da?",
+     "¿En qué te gustaría mejorar este trimestre?",
+     "¿Cómo se nota cuando estás siendo tu mejor versión?",
+     "Elige una cosa pequeña para practicar esta semana."
+   ]},
+  {dim:"Crecimiento", color:"#eab308", titulo:"Sé tú mismo",
+   intent:"Fortalecer la identidad y la seguridad personal.",
+   preguntas:[
+     "¿Qué es lo que más te gusta de cómo eres?",
+     "¿Alguna vez has hecho algo solo porque lo hacían los demás? ¿Cómo te sentiste?",
+     "¿Qué dirías a alguien que tiene miedo de ser diferente?",
+     "¿Cómo puedes ser más tú mismo en el colegio?"
+   ]},
+  {dim:"Servicio", color:"#a855f7", titulo:"Servir a los demás es amar a Dios",
+   intent:"Conectar el servicio concreto con el amor a Dios y a los otros.",
+   preguntas:[
+     "¿Qué significa para ti ayudar a alguien?",
+     "Cuéntame la última vez que hiciste algo bueno por otra persona.",
+     "¿Por qué crees que servir a los demás nos hace mejores?",
+     "¿A quién podrías servir esta semana de forma sencilla?"
+   ]},
+  {dim:"Espiritualidad", color:"#a855f7", titulo:"Te conoce, te entiende, te abraza",
+   intent:"Hablar del amor incondicional de Dios de forma cercana.",
+   preguntas:[
+     "¿Cómo te imaginas que Dios te mira?",
+     "¿Hay algún momento en el que te hayas sentido muy acompañado?",
+     "¿Qué te consuela cuando algo sale mal?",
+     "Si Dios te abrazara ahora mismo, ¿qué le contarías?"
+   ]},
+  {dim:"Espiritualidad", color:"#a855f7", titulo:"Verano + sacramentos, corazón contento",
+   intent:"Relacionar el descanso, los sacramentos y la alegría interior.",
+   preguntas:[
+     "¿Qué te hace sentir el corazón contento?",
+     "¿Has recibido algún sacramento? ¿Qué recuerdas de ese momento?",
+     "¿Cómo puedes cuidar tu corazón durante las vacaciones o el fin de semana?",
+     "¿Qué puedes hacer para llegar al lunes con el corazón más alegre?"
+   ]}
+];
+
+function renderTemas(){
+  const dims = [...new Set(TEMAS.map(t=>t.dim))];
+  const filtro = view.dimFiltro || "Todos";
+  const sid = view.alumnoTemas || "";
+  const alumno = sid ? allAlumnos().find(x=>x.id==sid) : null;
+  const lista = (filtro==="Todos" ? TEMAS : TEMAS.filter(t=>t.dim===filtro))
+    .map(t => ({...t, hecho: alumno ? yaTratado(alumno, t.titulo) : false}))
+    .sort((a,b) => (a.hecho===b.hecho?0:a.hecho?1:-1));
+  const tratados = alumno ? temasTratados(alumno).length : 0;
+  return `
+    <p class="hint" style="margin-top:0">Propuestas de conversación. Si eliges un alumno, se marcan los temas que ya habéis tratado y se priorizan los nuevos.</p>
+    <label>Ver para el alumno</label>
+    <select onchange="view.alumnoTemas=this.value; render()">
+      <option value="">Todos los temas (sin marcar)</option>
+      ${alumnos().map(a=>`<option value="${a.id}" ${a.id==sid?"selected":""}>${esc(full(a))}</option>`).join("")}
+    </select>
+    ${alumno? `<p class="hint">${tratados} de ${TEMAS.length} temas ya tratados con ${esc(full(alumno))}.</p>
+      <button class="btn primary" style="margin-top:6px" onclick="sugerirTema()">Sugerir un tema nuevo</button>`:""}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0">
+      <button class="btn small ${filtro==='Todos'?'primary':''}" style="width:auto;margin:0" onclick="view.dimFiltro='Todos'; render()">Todos</button>
+      ${dims.map(d=>`<button class="btn small ${filtro===d?'primary':''}" style="width:auto;margin:0" onclick="view.dimFiltro='${d}'; render()">${d}</button>`).join("")}
+    </div>
+    ${lista.map(t=>`
+      <div class="card" style="border-left:4px solid ${t.color};${t.hecho?'opacity:.72':''}">
+        <div>
+          <span class="chip" style="background:${t.color}22;color:${t.color}">${t.dim}</span>
+          ${t.hecho? `<span class="badge ok">Ya tratado</span>`:""}
+          <h3 style="margin:6px 0 4px;font-size:1.05rem">${esc(t.titulo)}</h3>
+          <p class="hint" style="margin:0">${esc(t.intent)}</p>
+        </div>
+        <details style="margin-top:10px">
+          <summary style="cursor:pointer;font-weight:600;color:var(--ink)">Ver preguntas</summary>
+          <ol style="margin:8px 0 0;padding-left:18px">
+            ${t.preguntas.map(q=>`<li style="margin:6px 0">${esc(q)}</li>`).join("")}
+          </ol>
+          <button class="btn ghost small" style="margin-top:8px" onclick="usarTema('${esc(t.titulo).replace(/'/g,"\\'")}')">Usar en una reunión</button>
+        </details>
+      </div>
+    `).join("")}
+  `;
+}
+function temasTratados(a){ return a.temasTratados || []; }
+function yaTratado(a, titulo){ return temasTratados(a).some(t => t.titulo === titulo); }
+function marcarTema(alumnoId, titulo, fecha, reunionId){
+  const a = P().alumnos.find(x => x.id == alumnoId);
+  if (!a || !titulo) return;
+  a.temasTratados = a.temasTratados || [];
+  if (a.temasTratados.some(t => t.titulo === titulo && t.reunionId === reunionId)) return;
+  a.temasTratados.push({titulo, fecha: fecha || new Date().toISOString().slice(0,10), reunionId: reunionId || null});
+}
+function detectarTema(texto){
+  if (!texto) return null;
+  const first = texto.split("\n")[0].trim();
+  return TEMAS.find(t => t.titulo === first || texto.startsWith(t.titulo))?.titulo || null;
+}
+
+function usarTema(titulo){
+  const t = TEMAS.find(x=>x.titulo===titulo);
+  if(!t) return;
+  view.temaPrefill = t.titulo + "\n\n" + t.preguntas.map((q,i)=>(i+1)+". "+q).join("\n");
+  view.temaUsado = t.titulo;
+  if (view.alumnoTemas) view.alumno = view.alumnoTemas;
+  go("nueva");
+}
+function sugerirTema(){
+  const id = view.alumnoTemas;
+  const a = id ? allAlumnos().find(x=>x.id==id) : null;
+  const pendientes = TEMAS.filter(t => !a || !yaTratado(a, t.titulo));
+  const pool = pendientes.length ? pendientes : TEMAS;
+  const pick = pool[Math.floor(Math.random()*pool.length)];
+  usarTema(pick.titulo);
+}
+function renderHome(){
+  const p = P();
+  const list = alumnos();
+  if (!list.length) {
+    return `<div class="card empty">
+      <p>Todavía no hay preceptuados.</p>
+      <button class="btn primary" onclick="go('alumnoForm',{alumno:null})">Añadir el primero</button>
+      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="go('ajustes')">Importar lista o abrir ajustes</button>
+    </div>`;
+  }
+  const mes = mesActual();
+  const hechos = list.filter(a => tieneMes(a.id, mes)).length;
+  const pend = list.length - hechos;
+  const pendientes = list.filter(a => !tieneMes(a.id, mes));
+  const hoy = new Date().toISOString().slice(0,10);
+  const proximas = (p.reuniones||[]).filter(r => r.fecha >= hoy).sort((a,b)=>a.fecha.localeCompare(b.fecha)).slice(0,6);
+  const recientes = (p.reuniones||[]).slice().sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,5);
+
+  const porTiempo = list.map(a => ({
+    a,
+    ultima: ultimaReunion(a.id),
+    dias: diasDesde(ultimaReunion(a.id))
+  })).sort((x,y) => y.dias - x.dias);
+
+  return `
+    <div class="kpis">
+      <div class="kpi"><b>${hechos}/${list.length}</b><span>${(MES_LABEL[mes]||mes)} hecho</span></div>
+      <div class="kpi"><b>${pend}</b><span>Pendientes</span></div>
+      <div class="kpi"><b>${(p.reuniones||[]).length}</b><span>Reuniones</span></div>
+    </div>
+    <div class="card">
+      <h2 class="sec">Más tiempo sin reunión</h2>
+      ${porTiempo.slice(0,8).map(({a,ultima,dias}) => `
+        <div class="student" onclick="go('ficha',{alumno:'${a.id}'})" style="${dias>=30||!ultima?'background:#fff8f5;border-radius:12px;padding:8px;margin:-4px -4px 6px':''}">
+          <div class="avatar">${esc(ini(a))}</div>
+          <div class="meta">
+            <h3>${esc(full(a))}</h3>
+            <small>${esc(a.curso||"Sin curso")} · ${ultima ? "Última "+fmt(ultima) : "Sin reuniones"}</small>
+          </div>
+          <span class="badge ${!ultima||dias>=30?"warn":dias>=14?"ok":"ok"}">${esc(textoDesde(ultima))}</span>
+        </div>
+      `).join("<hr class='sep'>")}
+    </div>
+    <div class="card">
+      <h2 class="sec">Pendientes de ${MES_LABEL[mes]||mes}</h2>
+      ${pendientes.length? pendientes.map(a=>studentRow(a)).join("<hr class='sep'>") : `<div class="empty">Todos tienen reunión este mes.</div>`}
+    </div>
+    <div class="card">
+      <h2 class="sec">${proximas.length?"Próximas":"Últimas reuniones"}</h2>
+      ${(proximas.length?proximas:recientes).map(r=>{
+        const a = allAlumnos().find(x=>x.id==r.alumnoId);
+        return `<div class="hist"><h4>${esc(a?full(a):"Alumno")}</h4><small>${fmt(r.fecha)} · ${esc(r.preceptor||"")} · ${esc(tipoLabel(r.tipo))}</small></div>`;
+      }).join("") || `<div class="empty">Aún no hay reuniones.</div>`}
+    </div>`;
+}
+
+function studentRow(a){
+  const mes = mesActual();
+  const n = reunionesDe(a.id).length;
+  const ok = tieneMes(a.id, mes);
+  return `<div class="student" onclick="go('ficha',{alumno:'${a.id}'})">
+    <div class="avatar">${esc(ini(a))}</div>
+    <div class="meta">
+      <h3>${esc(full(a))}</h3>
+      <small>${esc(a.curso||"Sin curso")} · ${n} reunión${n===1?"":"es"}</small>
+    </div>
+    <span class="badge ${ok?"ok":"warn"}">${ok? (MES_LABEL[mes]||mes)+" ✓":"Falta"}</span>
+  </div>`;
+}
+
+function renderAlumnos(){
+  const q = (view.q||"").toLowerCase();
+  const list = alumnos().filter(a => (full(a)+" "+(a.curso||"")).toLowerCase().includes(q));
+  const grupos = {};
+  list.forEach(a => { const k = a.curso || "Sin curso"; (grupos[k] ||= []).push(a); });
+  return `
+    <input class="search" placeholder="Buscar alumno o curso…" value="${esc(view.q||"")}" oninput="view.q=this.value; render()" />
+    <button class="btn primary" style="margin:0 0 14px" onclick="go('alumnoForm',{alumno:null})">＋ Añadir alumno</button>
+    ${list.length? Object.keys(grupos).sort().map(c => `
+      <h2 class="sec">${esc(c)} <small style="color:var(--muted);font-weight:500">(${grupos[c].length})</small></h2>
+      <div class="card">${grupos[c].map(a=>studentRow(a)).join("<hr class='sep'>")}</div>
+    `).join("") : `<div class="card empty">No hay alumnos${view.q?" con ese filtro":""}.</div>`}
+  `;
+}
+
+function renderFicha(a){
+  const p = P();
+  const rs = reunionesDe(a.id);
+  const objs = (a.objetivos||[]).map(id => p.objetivosCatalogo.find(o=>o.id===id)?.titulo || id).filter(Boolean);
+  return `
+    <div class="card">
+      <div class="student" style="cursor:default">
+        <div class="avatar">${esc(ini(a))}</div>
+        <div class="meta">
+          <h3>${esc(full(a))}</h3>
+          <small>${a.nac? "Nac. "+fmt(a.nac)+" · ":""}${a.primer? "1ª tutoría "+fmt(a.primer):""}</small>
+        </div>
+      </div>
+      ${objs.length? `<p style="margin:10px 0 0">${objs.map(o=>`<span class="chip">${esc(o)}</span>`).join("")}</p>`:""}
+      ${a.notas? `<p class="hint" style="white-space:pre-wrap">${esc(a.notas)}</p>`:""}
+      <div style="margin-top:14px">
+        <h2 class="sec" style="margin-bottom:8px">Notas por evaluación</h2>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+          ${[0,1,2,3,4].map(i => {
+            const val = (a.notasEval && a.notasEval[i]) || "";
+            return `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 4px;text-align:center">
+              <div style="font-size:.7rem;color:var(--muted)">Eval ${i+1}</div>
+              <div style="font-weight:700;font-size:1.05rem;margin-top:2px">${esc(val || "—")}</div>
+            </div>`;
+          }).join("")}
+        </div>
+        <p class="hint" style="margin-top:6px">Edita en la ficha o impórtalas desde Excel.</p>
+      </div>
+      ${a.fichaArchivo? `<p class="hint">Ficha: ${esc(a.fichaArchivo)}</p>`:""}
+      <div style="margin-top:12px">
+        <h2 class="sec" style="margin-bottom:6px">Temas de interés tratados</h2>
+        ${temasTratados(a).length
+          ? temasTratados(a).slice().reverse().map(t=>`<span class="chip">${esc(t.titulo)} <small>· ${fmt(t.fecha)}</small></span>`).join("")
+          : `<p class="hint" style="margin:0">Aún no hay temas marcados. Usa la pestaña Temas o registra una reunión con un tema.</p>`}
+      </div>
+      <div style="margin-top:12px" class="month-grid">
+        ${p.meses.map(m => `<div class="mcell ${tieneMes(a.id,m)?"done":""}">${MES_LABEL[m]||m.slice(0,3)}</div>`).join("")}
+      </div>
+      <div class="actions">
+        <button class="btn primary" style="margin-top:0;flex:1" onclick="go('nueva',{alumno:'${a.id}'})">＋ Reunión</button>
+        <button class="btn ghost" onclick="go('alumnoForm',{alumno:'${a.id}'})">Editar ficha</button>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" style="flex:1" type="button" onclick="document.getElementById('impDocx-${a.id}').click()">Importar ficha Word</button>
+      </div>
+      <input id="impDocx-${a.id}" type="file" accept=".docx,.txt" class="hidden" onchange="importarFichaWord(event, '${a.id}')" />
+      <p class="hint">Sube el .docx que tienes en Drive (o descarga y sube). Se leerán las notas familiares y las entradas con fecha.</p>
+    </div>
+    <h2 class="sec">Historial</h2>
+    ${rs.length? rs.map(r => `
+      <div class="card" onclick="go('editar',{reunion:'${r.id}', alumno:'${a.id}'})">
+        <div class="hist">
+          <h4>${fmt(r.fecha)} · ${esc(r.hora||"")} · ${esc(r.preceptor||"")}</h4>
+          <small>${esc(tipoLabel(r.tipo))} · ${esc(r.asistentes||"")}</small>
+          ${r.temas? `<p style="margin:6px 0 0">${esc(r.temas)}</p>`:""}
+        </div>
+      </div>
+    `).join("") : `<div class="empty">Aún no hay reuniones.</div>`}
+  `;
+}
+
+function renderAlumnoForm(id){
+  const p = P();
+  const a = id ? allAlumnos().find(x=>x.id==id) : {nombre:"",apellidos:"",curso:"",nac:"",primer:"",defaultPreceptor:p.preceptorActivo,objetivos:[],notas:"",activo:true};
+  const cursos = [...new Set(alumnos().map(x=>x.curso).filter(Boolean))];
+  return `
+    <form class="card" onsubmit="guardarAlumno(event,'${id||""}')">
+      <div class="row2">
+        <div><label>Nombre</label><input name="nombre" required value="${esc(a.nombre||"")}"></div>
+        <div><label>Apellidos</label><input name="apellidos" value="${esc(a.apellidos||"")}"></div>
+      </div>
+      <label>Curso / grupo</label>
+      <input name="curso" list="cursos" value="${esc(a.curso||"")}" placeholder="6 PRIM A" />
+      <datalist id="cursos">${cursos.map(c=>`<option value="${esc(c)}">`).join("")}</datalist>
+      <div class="row2">
+        <div><label>Fecha de nacimiento</label><input type="date" name="nac" value="${esc(a.nac||"")}"></div>
+        <div><label>1ª tutoría prevista</label><input type="date" name="primer" value="${esc(a.primer||"")}"></div>
+      </div>
+      <label>Preceptor habitual</label>
+      <select name="defaultPreceptor">
+        ${(p.preceptores||[]).map(x=>`<option ${x===(a.defaultPreceptor||p.preceptorActivo)?"selected":""}>${esc(x)}</option>`).join("")}
+        ${!(p.preceptores||[]).length? `<option>${esc(p.iniciales||"")}</option>`:""}
+      </select>
+      <label>Objetivos de tutoría</label>
+      ${(p.objetivosCatalogo||[]).map(o=>`
+        <label class="check"><input type="checkbox" name="obj" value="${o.id}" ${(a.objetivos||[]).includes(o.id)?"checked":""}><span>${esc(o.titulo)}</span></label>
+      `).join("") || `<p class="hint">Añade objetivos en Ajustes para asignarlos aquí.</p>`}
+      <label>Notas del alumno</label>
+      <textarea name="notas" placeholder="Contexto familiar, NEAE, observaciones…">${esc(a.notas||"")}</textarea>
+      <label style="margin-top:12px">Notas por evaluación (5)</label>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+        ${[0,1,2,3,4].map(i => `
+          <div>
+            <label style="font-size:.75rem;margin-bottom:2px">Eval ${i+1}</label>
+            <input name="eval${i}" value="${esc((a.notasEval && a.notasEval[i]) || "")}" placeholder="—" />
+          </div>
+        `).join("")}
+      </div>
+      <button class="btn primary" type="submit">Guardar alumno</button>
+      ${id? `<div class="actions"><button type="button" class="btn danger" style="flex:1" onclick="borrarAlumno('${id}')">Dar de baja</button></div>`:""}
+    </form>`;
+}
+
+function guardarAlumno(ev, id){
+  ev.preventDefault();
+  const f = ev.target;
+  const data = {
+    id: id || uid(),
+    nombre: f.nombre.value.trim(),
+    apellidos: f.apellidos.value.trim(),
+    curso: f.curso.value.trim(),
+    nac: f.nac.value,
+    primer: f.primer.value,
+    defaultPreceptor: f.defaultPreceptor.value,
+    objetivos: [...f.querySelectorAll("[name=obj]:checked")].map(x=>x.value),
+    notas: f.notas.value.trim(),
+    notasEval: [0,1,2,3,4].map(i => (f["eval"+i]?.value || "").trim()),
+    activo: true
+  };
+  const p = P();
+  if (id) p.alumnos = p.alumnos.map(a => a.id==id ? {...a, ...data} : a);
+  else p.alumnos.push(data);
+  save(); toast("Alumno guardado");
+  go("ficha", {alumno: data.id});
+}
+function borrarAlumno(id){
+  if(!confirm("¿Dar de baja a este alumno? Las reuniones se conservan en el historial.")) return;
+  const p = P();
+  p.alumnos = p.alumnos.map(a => a.id==id ? {...a, activo:false} : a);
+  save(); toast("Alumno dado de baja"); go("alumnos");
+}
+
+async function importarFichaWord(ev, alumnoId){
+  const file = ev.target.files[0];
+  if(!file) return;
+  toast("Leyendo ficha…");
+  try {
+    let text = "";
+    if (file.name.toLowerCase().endsWith(".docx")) {
+      if (typeof mammoth === "undefined") { toast("No se pudo cargar el lector de Word"); return; }
+      const arr = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({arrayBuffer: arr});
+      text = result.value || "";
+    } else {
+      text = await file.text();
+    }
+    text = text.replace(/\r/g, "").trim();
+    if (!text) { toast("El archivo está vacío"); return; }
+    aplicarFicha(alumnoId, text, file.name);
+  } catch(e) {
+    console.error(e);
+    toast("No se pudo leer el archivo");
+  }
+  ev.target.value = "";
+}
+
+function aplicarFicha(alumnoId, text, filename){
+  const p = P();
+  const a = p.alumnos.find(x => x.id == alumnoId);
+  if (!a) return;
+
+  const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+  let nac = a.nac || "";
+  const family = [];
+  const meetings = [];
+  let current = null;
+
+  const dateRe = /^(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?\s*$/;
+  const birthRe = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})\b/;
+
+  for (const line of lines) {
+    const dm = line.match(dateRe);
+    if (dm) {
+      if (current) meetings.push(current);
+      const day = dm[1].padStart(2,"0");
+      const mon = dm[2].padStart(2,"0");
+      let year = dm[3];
+      if (!year) year = new Date().getFullYear().toString();
+      else if (year.length === 2) year = "20" + year;
+      current = { fecha: `${year}-${mon}-${day}`, temas: "" };
+      continue;
+    }
+    if (!nac) {
+      const bm = line.match(birthRe);
+      if (bm && !current) {
+        const y = bm[3], m = bm[2].padStart(2,"0"), d = bm[1].padStart(2,"0");
+        nac = `${y}-${m}-${d}`;
+        continue;
+      }
+    }
+    if (current) {
+      current.temas += (current.temas ? "\n" : "") + line;
+    } else {
+      if (!/^\d{6,}$/.test(line) && !/^https?:\/\//i.test(line) && line.length > 2) {
+        family.push(line);
+      }
+    }
+  }
+  if (current) meetings.push(current);
+
+  if (nac) a.nac = nac;
+  if (family.length) {
+    const extra = family.join("\n");
+    a.notas = a.notas ? (a.notas + "\n\n" + extra).trim() : extra;
+  }
+  a.fichaArchivo = filename;
+  a.fichaTexto = text.slice(0, 8000);
+
+  let added = 0;
+  meetings.forEach(m => {
+    if (!m.temas.trim()) return;
+    const exists = (p.reuniones||[]).some(r => r.alumnoId == a.id && r.fecha === m.fecha && (r.temas||"").includes(m.temas.slice(0,40)));
+    if (exists) return;
+    p.reuniones.push({
+      id: uid(),
+      alumnoId: a.id,
+      fecha: m.fecha,
+      hora: "",
+      preceptor: a.defaultPreceptor || p.preceptorActivo || p.iniciales,
+      tipo: "individual",
+      asistentes: "Alumno",
+      temas: m.temas.trim(),
+      acuerdos: "",
+      notas: "Importado de " + filename,
+      auto: true
+    });
+    added++;
+  });
+
+  save();
+  toast(added ? `Ficha importada · ${added} reunión${added===1?"":"es"}` : "Ficha importada (sin reuniones nuevas)");
+  go("ficha", {alumno: a.id});
+}
+
+function tipoLabel(id){
+  return P().tiposReunion.find(t=>t.id===id)?.label || id || "";
+}
+
+function renderForm(id){
+  const p = P();
+  const list = alumnos();
+  if (!list.length) {
+    return `<div class="card empty"><p>Primero añade alumnos a tu lista.</p><button class="btn primary" onclick="go('alumnoForm',{alumno:null})">Añadir alumno</button></div>`;
+  }
+  const r = id ? p.reuniones.find(x=>x.id===id) : {
+    alumnoId: view.alumno || list[0].id,
+    fecha: new Date().toISOString().slice(0,10),
+    hora: new Date().toTimeString().slice(0,5),
+    preceptor: p.preceptorActivo || p.iniciales,
+    tipo: (p.tiposReunion[0]||{}).id,
+    asistentes: "Alumno",
+    temas: view.temaPrefill || "",
+    acuerdos: "", notas:""
+  };
+  if (!id && view.temaPrefill) view.temaPrefill = "";
+  return `
+    <form class="card" onsubmit="guardarReunion(event,'${id||""}')">
+      <label>Alumno</label>
+      <select name="alumnoId">${list.map(a=>`<option value="${a.id}" ${a.id==r.alumnoId?"selected":""}>${esc(full(a))} · ${esc(a.curso||"")}</option>`).join("")}</select>
+      <div class="row2">
+        <div><label>Fecha</label><input type="date" name="fecha" value="${esc(r.fecha||"")}" required></div>
+        <div><label>Hora</label><input type="time" name="hora" value="${esc(r.hora||"")}"></div>
+      </div>
+      <div class="row2">
+        <div>
+          <label>Preceptor</label>
+          <select name="preceptor">${(p.preceptores.length?p.preceptores:[p.iniciales]).map(x=>`<option ${x===r.preceptor?"selected":""}>${esc(x)}</option>`).join("")}</select>
+        </div>
+        <div>
+          <label>Tipo</label>
+          <select name="tipo">${p.tiposReunion.map(t=>`<option value="${t.id}" ${t.id===r.tipo?"selected":""}>${esc(t.label)}</option>`).join("")}</select>
+        </div>
+      </div>
+      <label>Asistentes</label>
+      <input name="asistentes" value="${esc(r.asistentes||"")}" placeholder="Alumno, madre, padre…" />
+      <label>Temas tratados</label>
+      <textarea name="temas">${esc(r.temas||"")}</textarea>
+      <label>Acuerdos / próximos pasos</label>
+      <textarea name="acuerdos">${esc(r.acuerdos||"")}</textarea>
+      <label>Notas internas</label>
+      <textarea name="notas">${esc(r.notas||"")}</textarea>
+      <button class="btn primary" type="submit">${id?"Guardar cambios":"Registrar reunión"}</button>
+      ${id? `<div class="actions"><button type="button" class="btn danger" style="flex:1" onclick="borrarReunion('${id}')">Eliminar</button></div>`:""}
+    </form>`;
+}
+
+function guardarReunion(ev, id){
+  ev.preventDefault();
+  const f = ev.target;
+  const data = {
+    id: id || uid(),
+    alumnoId: f.alumnoId.value,
+    fecha: f.fecha.value,
+    hora: f.hora.value,
+    preceptor: f.preceptor.value,
+    tipo: f.tipo.value,
+    asistentes: f.asistentes.value.trim(),
+    temas: f.temas.value.trim(),
+    acuerdos: f.acuerdos.value.trim(),
+    notas: f.notas.value.trim()
+  };
+  const p = P();
+  if (id) p.reuniones = p.reuniones.map(r => r.id===id? {...r,...data}: r);
+  else p.reuniones.push(data);
+  const tituloTema = view.temaUsado || detectarTema(data.temas);
+  if (tituloTema) marcarTema(data.alumnoId, tituloTema, data.fecha, data.id);
+  view.temaUsado = null;
+  save(); toast(id?"Reunión actualizada":"Reunión registrada");
+  go("ficha", {alumno: data.alumnoId});
+}
+function borrarReunion(id){
+  if(!confirm("¿Eliminar esta reunión?")) return;
+  const p = P();
+  const r = p.reuniones.find(x=>x.id===id);
+  p.reuniones = p.reuniones.filter(x=>x.id!==id);
+  save(); toast("Eliminada"); go("ficha", {alumno: r.alumnoId});
+}
+
+function renderAjustes(){
+  const p = P();
+  return `
+    <div class="card">
+      <h2 class="sec">Perfil</h2>
+      <label>Nombre del profesor</label>
+      <input value="${esc(p.nombre)}" onchange="P().nombre=this.value; save(); render()" />
+      <div class="row2">
+        <div><label>Iniciales</label><input value="${esc(p.iniciales)}" onchange="P().iniciales=this.value.toUpperCase(); save(); render()" /></div>
+        <div><label>Curso escolar</label><input value="${esc(p.cursoEscolar)}" onchange="P().cursoEscolar=this.value; save(); render()" /></div>
+      </div>
+      <label>Centro</label>
+      <input value="${esc(p.centro)}" onchange="P().centro=this.value; save()" />
+      <label>Preceptor que registra por defecto</label>
+      <select onchange="P().preceptorActivo=this.value; save(); toast('Guardado')">
+        ${p.preceptores.map(x=>`<option ${x===p.preceptorActivo?"selected":""}>${esc(x)}</option>`).join("")}
+      </select>
+    </div>
+
+    <div class="card">
+      <h2 class="sec">Equipo de preceptores</h2>
+      <p class="hint">Iniciales que aparecerán en el desplegable de cada reunión.</p>
+      ${(p.preceptores||[]).map((x,i)=>`<span class="chip">${esc(x)} <button type="button" onclick="quitarItem('preceptores',${i})">×</button></span>`).join("")}
+      <div class="actions">
+        <input id="newPre" placeholder="Nuevas iniciales" style="flex:1" />
+        <button class="btn ghost small" type="button" onclick="addChip('preceptores','newPre', true)">Añadir</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="sec">Meses del curso</h2>
+      <p class="hint">Marca los meses en los que debe haber seguimiento.</p>
+      ${["septiembre","octubre","noviembre","diciembre","enero","febrero","marzo","abril","mayo","junio","julio","agosto"].map(m=>`
+        <label class="check"><input type="checkbox" ${p.meses.includes(m)?"checked":""} onchange="toggleMes('${m}', this.checked)"><span style="text-transform:capitalize">${m}</span></label>
+      `).join("")}
+    </div>
+
+    <div class="card">
+      <h2 class="sec">Tipos de reunión</h2>
+      ${(p.tiposReunion||[]).map((t,i)=>`<span class="chip">${esc(t.label)} <button type="button" onclick="quitarItem('tiposReunion',${i})">×</button></span>`).join("")}
+      <div class="actions">
+        <input id="newTipo" placeholder="Nuevo tipo" style="flex:1" />
+        <button class="btn ghost small" type="button" onclick="addTipo()">Añadir</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="sec">Catálogo de objetivos</h2>
+      <p class="hint">Luego los asignas a cada alumno desde su ficha.</p>
+      ${(p.objetivosCatalogo||[]).map((o,i)=>`<span class="chip">${esc(o.titulo)} <button type="button" onclick="quitarItem('objetivosCatalogo',${i})">×</button></span>`).join("")}
+      <div class="actions">
+        <input id="newObj" placeholder="Nuevo objetivo" style="flex:1" />
+        <button class="btn ghost small" type="button" onclick="addObj()">Añadir</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="sec">Lista de alumnos</h2>
+      <p class="hint">${alumnos().length} activos · ${allAlumnos().filter(a=>a.activo===false).length} dados de baja</p>
+      <button class="btn primary" style="margin-top:0" type="button" onclick="go('alumnoForm',{alumno:null})">Añadir alumno</button>
+      <div class="actions">
+        <button class="btn ghost" style="flex:1" type="button" onclick="document.getElementById('impX').click()">Importar Excel / CSV</button>
+        <button class="btn ghost" style="flex:1" type="button" onclick="descargarPlantilla()">Plantilla Excel</button>
+        <button class="btn ghost" style="flex:1" type="button" onclick="document.getElementById('impNotas').click()">Importar notas</button>
+      </div>
+      <input id="impX" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="importarTabla(event)" />
+      <input id="impNotas" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="importarNotas(event)" />
+      ${allAlumnos().some(a=>a.activo===false)? `<button class="btn ghost" style="width:100%;margin-top:8px" type="button" onclick="restaurarBajas()">Restaurar dados de baja</button>`:""}
+    </div>
+
+    <div class="card">
+      <h2 class="sec">Almacenamiento</h2>
+      <p class="hint">Todo se guarda solo en la memoria interna de este navegador. No hace falta cuenta ni internet. Si borras los datos del navegador o usas otro dispositivo, la lista no viaja conmigo.</p>
+    </div>
+
+    <div class="card">
+      <h2 class="sec">Exportar e intercambiar</h2>
+      <button class="btn primary" style="margin-top:0" type="button" onclick="exportarXlsx()">Descargar Excel de reuniones</button>
+      <div class="actions">
+        <button class="btn ghost" style="flex:1" type="button" onclick="exportarJSON()">Copia JSON</button>
+        <button class="btn ghost" style="flex:1" type="button" onclick="document.getElementById('impJ').click()">Restaurar JSON</button>
+      </div>
+      <input id="impJ" type="file" accept="application/json" class="hidden" onchange="importarJSON(event)" />
+    </div>
+
+    <div class="card">
+      <h2 class="sec">Profesores en este dispositivo</h2>
+      ${db.profiles.map(pr => `
+        <div class="student" onclick="cambiarPerfil('${pr.id}')">
+          <div class="avatar">${esc((pr.iniciales||"P").slice(0,2))}</div>
+          <div class="meta"><h3>${esc(pr.nombre||"Sin nombre")}</h3><small>${(pr.alumnos||[]).filter(a=>a.activo!==false).length} alumnos · ${esc(pr.cursoEscolar||"")}</small></div>
+          ${pr.id===p.id? `<span class="badge ok">Activo</span>`:""}
+        </div>
+      `).join("<hr class='sep'>")}
+      <div class="actions">
+        <button class="btn ghost" style="flex:1" type="button" onclick="view.setup=true; render()">＋ Nuevo profesor</button>
+        ${db.profiles.length>1? `<button class="btn danger" type="button" onclick="borrarPerfil()">Eliminar este perfil</button>`:""}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="sec">Resumen mensual</h2>
+      ${renderResumen()}
+    </div>
+  `;
+}
+
+function addChip(field, inputId, upper){
+  const el = document.getElementById(inputId);
+  let v = (el.value||"").trim();
+  if(!v) return;
+  if(upper) v = v.toUpperCase();
+  const p = P();
+  if(!p[field].includes(v)) p[field].push(v);
+  if(field==="preceptores" && !p.preceptorActivo) p.preceptorActivo = v;
+  el.value=""; save(); render();
+}
+function addTipo(){
+  const el = document.getElementById("newTipo");
+  const v = (el.value||"").trim();
+  if(!v) return;
+  P().tiposReunion.push({id: uid(), label:v});
+  el.value=""; save(); render();
+}
+function addObj(){
+  const el = document.getElementById("newObj");
+  const v = (el.value||"").trim();
+  if(!v) return;
+  P().objetivosCatalogo.push({id: uid(), titulo:v});
+  el.value=""; save(); render();
+}
+function quitarItem(field, i){
+  P()[field].splice(i,1); save(); render();
+}
+function toggleMes(m, on){
+  const p = P();
+  if(on && !p.meses.includes(m)) p.meses.push(m);
+  if(!on) p.meses = p.meses.filter(x=>x!==m);
+  const order = ["septiembre","octubre","noviembre","diciembre","enero","febrero","marzo","abril","mayo","junio","julio","agosto"];
+  p.meses.sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+  save();
+}
+function cambiarPerfil(id){
+  db.currentProfileId = id; save(); toast("Perfil cambiado"); go("home");
+}
+function borrarPerfil(){
+  if(!confirm("Esto borra la lista y las reuniones de este profesor en el dispositivo. ¿Continuar?")) return;
+  db.profiles = db.profiles.filter(p => p.id !== P().id);
+  db.currentProfileId = db.profiles[0]?.id || null;
+  save(); toast("Perfil eliminado");
+  if(!db.profiles.length){ view.setup=true; render(); } else go("home");
+}
+function restaurarBajas(){
+  P().alumnos.forEach(a => a.activo = true); save(); toast("Restaurados"); render();
+}
+
+function renderResumen(){
+  const p = P();
+  if(!alumnos().length) return `<p class="hint">Sin alumnos.</p>`;
+  let html = `<div style="overflow:auto"><table style="border-collapse:collapse;width:100%;font-size:.75rem">
+    <tr><th style="text-align:left;padding:4px">Alumno</th>${p.meses.map(m=>`<th style="padding:4px">${MES_LABEL[m]||m.slice(0,3)}</th>`).join("")}</tr>`;
+  alumnos().forEach(a=>{
+    html += `<tr><td style="padding:4px 6px 4px 0">${esc(a.nombre)} ${esc((a.apellidos||"").split(" ")[0]||"")}</td>`;
+    p.meses.forEach(m=>{
+      const rs = (p.reuniones||[]).filter(r=>r.alumnoId==a.id && mesDe(r.fecha)===m);
+      html += `<td style="text-align:center;padding:4px">${esc(rs.map(r=>r.preceptor).join("/")||"")}</td>`;
+    });
+    html += `</tr>`;
+  });
+  return html + `</table></div>`;
+}
+
+function descargarPlantilla(){
+  if(typeof XLSX==="undefined"){ toast("No se pudo cargar Excel"); return; }
+  const rows = [["Nombre","Apellidos","Curso","Nacimiento (YYYY-MM-DD)","Primera tutoria (YYYY-MM-DD)","Preceptor","Eval1","Eval2","Eval3","Eval4","Eval5"]];
+  rows.push(["María","López García","1 ESO A","2013-04-02","2026-09-20", P().iniciales||"","7.5","8","NT","6","SB"]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "Alumnos");
+  XLSX.writeFile(wb, "Plantilla_preceptuados.xlsx");
+}
+
+function importarNotas(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const wb = XLSX.read(reader.result, {type:"array", cellDates:true});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {defval:""});
+      if(!rows.length){ toast("La hoja está vacía"); return; }
+      const norm = k => String(k||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+      const p = P();
+      let updated = 0;
+      rows.forEach(row => {
+        const map = {};
+        Object.keys(row).forEach(k => map[norm(k)] = row[k]);
+        let nombre = String(map.nombre || map.name || "").trim();
+        let apellidos = String(map.apellidos || map.apellido || "").trim();
+        if(!nombre && map.alumno){
+          const parts = String(map.alumno).trim().split(/\s+/);
+          nombre = parts.shift() || "";
+          apellidos = parts.join(" ");
+        }
+        if(!nombre) return;
+        // Buscar alumno existente
+        const fullName = (nombre + " " + apellidos).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+        const alumno = (p.alumnos||[]).find(a => {
+          const af = (a.nombre + " " + (a.apellidos||"")).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+          return af === fullName || af.includes(nombre.toLowerCase());
+        });
+        if(!alumno) return;
+        // Mapear evaluaciones
+        const evals = ["","","","",""];
+        for(let i=1; i<=5; i++){
+          const keys = [
+            "eval"+i, "evaluacion"+i, "eval "+i, "evaluación "+i,
+            i+"ª", i+"a", "nota"+i, "nota "+i, "e"+i
+          ];
+          for(const k of keys){
+            if(map[k] !== undefined && String(map[k]).trim()){
+              evals[i-1] = String(map[k]).trim();
+              break;
+            }
+          }
+        }
+        alumno.notasEval = evals;
+        updated++;
+      });
+      save();
+      toast(updated + " alumnos actualizados con notas");
+      go("alumnos");
+    } catch(e){ console.error(e); toast("No se pudo leer el archivo de notas"); }
+  };
+  reader.readAsArrayBuffer(file);
+  ev.target.value = ""; // reset
+}
+
+function importarTabla(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const wb = XLSX.read(reader.result, {type:"array", cellDates:true});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {defval:""});
+      if(!rows.length){ toast("La hoja está vacía"); return; }
+      const norm = k => String(k||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+      let added = 0;
+      rows.forEach(row => {
+        const map = {};
+        Object.keys(row).forEach(k => map[norm(k)] = row[k]);
+        const nombre = String(map.nombre || map.name || "").trim();
+        let apellidos = String(map.apellidos || map.apellido || "").trim();
+        if(!nombre && map.alumno){
+          const parts = String(map.alumno).trim().split(/\s+/);
+          map.nombre = parts.shift();
+          apellidos = parts.join(" ");
+        }
+        const nom = String(map.nombre||nombre).trim();
+        if(!nom) return;
+        const nac = parseDateCell(map.nacimiento || map.nac || map.fecha_nacimiento);
+        const primer = parseDateCell(map["primera tutoria"] || map.primera || map.primer);
+        P().alumnos.push({
+          id: uid(),
+          nombre: nom,
+          apellidos,
+          curso: String(map.curso || map.grupo || map.clase || "").trim(),
+          nac, primer,
+          defaultPreceptor: String(map.preceptor || P().preceptorActivo || P().iniciales).trim(),
+          objetivos: [], notas: String(map.notas||"").trim(), activo:true
+        });
+        added++;
+      });
+      save(); toast(added+" alumnos importados"); go("alumnos");
+    } catch(e){ console.error(e); toast("No se pudo leer el archivo"); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function parseDateCell(v){
+  if(!v) return "";
+  if(v instanceof Date && !isNaN(v)) return v.toISOString().slice(0,10);
+  const s = String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if(m){
+    const y = m[3].length===2 ? "20"+m[3] : m[3];
+    return `${y}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+  }
+  return "";
+}
+
+function exportarXlsx(){
+  if(typeof XLSX==="undefined"){ toast("No se pudo cargar Excel"); return; }
+  const p = P();
+  const wb = XLSX.utils.book_new();
+  const header = ["Nº","Curso","Nombre","Apellidos","Nacimiento", ...p.meses.map(m=>m.toUpperCase()), "Objetivos"];
+  const rows = [header];
+  alumnos().forEach((a,i)=>{
+    const row = [i+1, a.curso||"", a.nombre, a.apellidos||"", fmt(a.nac)];
+    p.meses.forEach(m=>{
+      const rs = (p.reuniones||[]).filter(r=>r.alumnoId==a.id && mesDe(r.fecha)===m);
+      row.push(rs.map(r=>r.preceptor).join(" / "));
+    });
+    row.push((a.objetivos||[]).map(id => p.objetivosCatalogo.find(o=>o.id===id)?.titulo || id).join("; "));
+    rows.push(row);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "Preceptuados");
+  const det = [["Fecha","Hora","Alumno","Curso","Preceptor","Tipo","Asistentes","Temas","Acuerdos","Notas"]];
+  (p.reuniones||[]).slice().sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))).forEach(r=>{
+    const a = allAlumnos().find(x=>x.id==r.alumnoId);
+    det.push([fmt(r.fecha), r.hora||"", a?full(a):"", a?.curso||"", r.preceptor||"", tipoLabel(r.tipo), r.asistentes||"", r.temas||"", r.acuerdos||"", r.notas||""]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), "Actas");
+  const al = [["Nombre","Apellidos","Curso","Nacimiento","Primera tutoria","Preceptor","Notas","Objetivos"]];
+  alumnos().forEach(a=> al.push([a.nombre,a.apellidos,a.curso,a.nac,a.primer,a.defaultPreceptor,a.notas,(a.objetivos||[]).map(id=>p.objetivosCatalogo.find(o=>o.id===id)?.titulo||id).join("; ")]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(al), "Alumnos");
+  XLSX.writeFile(wb, `Preceptuados_${(p.iniciales||"prof")}_${(p.cursoEscolar||"").replace("/","-")}.xlsx`);
+  toast("Excel descargado");
+}
+function exportarJSON(){
+  const blob = new Blob([JSON.stringify(db, null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "preceptor-backup.json";
+  a.click();
+}
+function importarJSON(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (data.profiles?.length) {
+        db = data;
+        if (!db.currentProfileId) db.currentProfileId = db.profiles[0].id;
+      } else if (data.reuniones && !data.profiles) {
+        const prof = newProfile({nombre:"Importado", iniciales:"PROF", reuniones:data.reuniones, alumnos:data.alumnos||[]});
+        db.profiles.push(prof); db.currentProfileId = prof.id;
+      } else throw new Error("formato");
+      view.setup = false; save(); toast("Datos restaurados"); go("home");
+    } catch(e){ toast("Archivo no válido"); }
+  };
+  reader.readAsText(file);
+}
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+render();
+</script>
+</body>
+</html>

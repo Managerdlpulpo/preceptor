@@ -696,29 +696,33 @@ function renderFicha(a){
       ${a.notas? `<p class="hint" style="white-space:pre-wrap">${esc(a.notas)}</p>`:""}
       <div style="margin-top:14px">
         <h2 class="sec" style="margin-bottom:8px">Notas por evaluación</h2>
-        <div style="overflow-x:auto">
-          <table style="border-collapse:collapse;width:100%;font-size:.75rem;min-width:480px">
-            <thead>
-              <tr>
-                <th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)">Asignatura</th>
-                ${[1,2,3,4,5].map(e => `<th style="padding:4px;border-bottom:1px solid var(--line)">Eval ${e}</th>`).join("")}
-              </tr>
-            </thead>
-            <tbody>
-              ${SUBJECTS.map(subj => {
-                const row = (a.notasEval || {});
-                return `<tr>
-                  <td style="padding:4px 6px;border-bottom:1px solid var(--line);font-weight:500">${esc(subj)}</td>
-                  ${[1,2,3,4,5].map(e => {
-                    const val = (row[e] && row[e][subj]) || "";
-                    return `<td style="text-align:center;padding:4px;border-bottom:1px solid var(--line)">${esc(val || "—")}</td>`;
-                  }).join("")}
-                </tr>`;
+        ${[1,2,3,4,5].map(e => {
+          const data = (a.notasEval && a.notasEval[e]) || {};
+          const hasData = Object.keys(data).length > 0;
+          if (!hasData) return "";
+          return `<details style="margin-bottom:10px" ${e===1?"open":""}>
+            <summary style="cursor:pointer;font-weight:600;padding:6px 0">Evaluación ${e}</summary>
+            <div style="overflow-x:auto;margin-top:6px">
+              ${Object.keys(data).map(subj => {
+                const info = data[subj];
+                if (!info) return "";
+                const isObj = typeof info === "object" && info !== null;
+                const global = isObj ? (info.global || "") : String(info);
+                const items = isObj ? (info.items || {}) : {};
+                return `<div style="margin-bottom:10px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:10px">
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <strong>${esc(subj)}</strong>
+                    ${global ? `<span class="badge ok" style="font-size:.85rem">${esc(global)}</span>` : ""}
+                  </div>
+                  ${Object.keys(items).length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+                    ${Object.entries(items).map(([k,v]) => v ? `<span class="chip" style="font-size:.72rem">${esc(k)}: <b>${esc(v)}</b></span>` : "").join("")}
+                  </div>` : ""}
+                </div>`;
               }).join("")}
-            </tbody>
-          </table>
-        </div>
-        <p class="hint" style="margin-top:6px">Edita en la ficha o impórtalas desde Excel. Educación Cívica solo aparece si tiene nota.</p>
+            </div>
+          </details>`;
+        }).join("")}
+        <p class="hint" style="margin-top:6px">Importa desde el Estadillo para ver notas globales e ítems detallados.</p>
       </div>
       ${a.fichaArchivo? `<p class="hint">Ficha: ${esc(a.fichaArchivo)}</p>`:""}
       <div style="margin-top:12px">
@@ -1363,21 +1367,32 @@ function importarEstadillo(aoa){
       const letterRow = aoa[j+1] || [];
       const ne = alumno.notasEval || {"1":{},"2":{},"3":{},"4":{},"5":{}};
       if (!ne[evalNum]) ne[evalNum] = {};
-      Object.keys(subjectMap).forEach(code => {
+      // Detailed items mapping
+      const itemDefs = {
+        "EART": { subj: "Plástica", items: [{col:7, name:"Plástica"}, {col:8, name:"Música"}] },
+        "EFIS": { subj: "Educación Física", items: [{col:13, name:"Aseo y vestuario"}, {col:14, name:"Competencia motriz"}, {col:15, name:"Participación"}] },
+        "LCAS": { subj: "Lengua castellana", items: [{col:19, name:"Actividades"}, {col:20, name:"Contenidos"}, {col:21, name:"Lectura"}, {col:22, name:"Ortografía"}] },
+        "ING": { subj: "Inglés", items: [{col:25, name:"Reading"}, {col:26, name:"Speaking"}, {col:27, name:"Writing"}, {col:28, name:"Listening"}] },
+        "MAT": { subj: "Matemáticas", items: [{col:31, name:"Actividades"}, {col:32, name:"Cálculo Escrito"}, {col:33, name:"Cálculo Mental"}, {col:34, name:"Contenidos"}, {col:35, name:"Problemas"}] },
+        "CNAT": { subj: "Natural Science", items: [{col:37, name:"Concepts"}, {col:38, name:"Personal Work"}] },
+        "CSOC": { subj: "Social Science", items: [{col:43, name:"Concepts"}, {col:45, name:"Personal Work"}] },
+        "REL": { subj: "Religión", items: [{col:50, name:"Conocimientos"}, {col:51, name:"Oraciones"}] },
+        "MC": { subj: "Educación Cívica", items: [{col:58, name:"Amistad"}, {col:59, name:"Orden"}, {col:60, name:"Responsabilidad"}, {col:61, name:"Servicio"}, {col:62, name:"Respeto"}, {col:63, name:"Trabajo Personal"}] }
+      };
+      Object.keys(itemDefs).forEach(code => {
+        const def = itemDefs[code];
         const col = colMap[code];
-        if (col == null) return;
-        const letter = String(letterRow[col] || "").trim();
-        const num = String(aoa[j][col] || "").trim();
-        const val = letter && /^[ABCD]$/i.test(letter) ? letter.toUpperCase() : (num && !isNaN(num) ? num : "");
-        if (val) {
-          const subj = subjectMap[code];
-          ne[evalNum][subj] = val;
-          if (code === "EART") {
-            // Música is often next column
-            const musLetter = String(letterRow[col+1] || "").trim();
-            const musNum = String(aoa[j][col+1] || "").trim();
-            const musVal = musLetter && /^[ABCD]$/i.test(musLetter) ? musLetter.toUpperCase() : (musNum && !isNaN(musNum) ? musNum : "");
-            if (musVal) ne[evalNum]["Música"] = musVal;
+        const letter = col != null ? String(letterRow[col] || "").trim() : "";
+        const global = letter && /^[ABCD]$/i.test(letter) ? letter.toUpperCase() : "";
+        const items = {};
+        def.items.forEach(it => {
+          const v = String(aoa[j][it.col] || "").trim();
+          if (v) items[it.name] = v;
+        });
+        if (global || Object.keys(items).length) {
+          ne[evalNum][def.subj] = { global, items };
+          if (code === "EART" && items["Música"]) {
+            ne[evalNum]["Música"] = { global: "", items: { "Música": items["Música"] } };
           }
         }
       });

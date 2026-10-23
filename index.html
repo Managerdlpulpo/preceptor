@@ -1247,11 +1247,7 @@ function importarNotas(ev){
           apellidos = parts.join(" ");
         }
         if(!nombre) return;
-        const fullName = (nombre + " " + apellidos).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-        const alumno = (p.alumnos||[]).find(a => {
-          const af = (a.nombre + " " + (a.apellidos||"")).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-          return af === fullName || af.includes(nombre.toLowerCase());
-        });
+        const alumno = findAlumnoByName((nombre + " " + apellidos).trim() || nombre, p.alumnos || []);
         if(!alumno) return;
         const ne = alumno.notasEval || {"1":{},"2":{},"3":{},"4":{},"5":{}};
         ["1","2","3","4","5"].forEach(e => { if(!ne[e]) ne[e] = {}; });
@@ -1282,6 +1278,44 @@ function importarNotas(ev){
   };
   reader.readAsArrayBuffer(file);
   ev.target.value = "";
+}
+
+function findAlumnoByName(excelName, alumnos) {
+  if (!excelName || !alumnos.length) return null;
+  const norm = s => String(s||"").toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-z0-9\s]/g," ")
+    .replace(/\s+/g," ").trim();
+
+  const excelNorm = norm(excelName);
+  const excelParts = excelNorm.split(" ").filter(Boolean);
+
+  // Try several strategies
+  for (const a of alumnos) {
+    const appNorm = norm((a.nombre||"") + " " + (a.apellidos||""));
+    const appParts = appNorm.split(" ").filter(Boolean);
+    const revNorm = norm((a.apellidos||"") + " " + (a.nombre||""));
+    const revParts = revNorm.split(" ").filter(Boolean);
+
+    // Exact after normalization
+    if (excelNorm === appNorm || excelNorm === revNorm) return a;
+
+    // All significant parts of one are in the other
+    const excelSet = new Set(excelParts);
+    const appSet = new Set(appParts);
+    const common = [...excelSet].filter(x => appSet.has(x));
+    if (common.length >= Math.min(2, excelParts.length, appParts.length) && common.length >= excelParts.length - 1) return a;
+
+    // Surname match + first name start
+    if (excelParts.length >= 2 && appParts.length >= 2) {
+      const excelSurname = excelParts.slice(-2).join(" "); // last two often surnames
+      const appSurname = appParts.slice(-2).join(" ");
+      if (excelSurname && appSurname && (excelSurname.includes(appParts[appParts.length-1]) || appSurname.includes(excelParts[excelParts.length-1]))) {
+        if (excelParts[0].startsWith(appParts[0].slice(0,3)) || appParts[0].startsWith(excelParts[0].slice(0,3))) return a;
+      }
+    }
+  }
+  return null;
 }
 
 function importarEstadillo(aoa){
@@ -1316,12 +1350,8 @@ function importarEstadillo(aoa){
   for (let i = 0; i < aoa.length; i++) {
     const nameCell = String(aoa[i][0] || "").trim();
     if (!nameCell || nameCell === "Alumno" || nameCell.includes("Totales")) continue;
-    // Student name row found
-    const full = normName(nameCell);
-    const alumno = (p.alumnos||[]).find(a => {
-      const af = normName((a.nombre || "") + " " + (a.apellidos || ""));
-      return af === full || full.includes(af) || af.includes(full.split(" ")[0]);
-    });
+    // Student name row found — matching flexible
+    const alumno = findAlumnoByName(nameCell, p.alumnos || []);
     if (!alumno) continue;
     // Look ahead for evaluation rows and letter grade rows
     for (let j = i+1; j < Math.min(i+8, aoa.length); j++) {

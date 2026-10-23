@@ -1223,6 +1223,14 @@ function importarNotas(ev){
     try {
       const wb = XLSX.read(reader.result, {type:"array", cellDates:true});
       const sheet = wb.Sheets[wb.SheetNames[0]];
+      // Try Estadillo format first (wide multi-row blocks)
+      const aoa = XLSX.utils.sheet_to_json(sheet, {header:1, defval:""});
+      const isEstadillo = aoa.some(row => row.some(c => String(c).includes("EART") || String(c).includes("LCAS") || String(c).includes("1ª Ev")));
+      if (isEstadillo) {
+        importarEstadillo(aoa);
+        return;
+      }
+      // Fallback to simple column format
       const rows = XLSX.utils.sheet_to_json(sheet, {defval:""});
       if(!rows.length){ toast("La hoja está vacía"); return; }
       const norm = k => String(k||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
@@ -1239,26 +1247,20 @@ function importarNotas(ev){
           apellidos = parts.join(" ");
         }
         if(!nombre) return;
-        // Buscar alumno existente
         const fullName = (nombre + " " + apellidos).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
         const alumno = (p.alumnos||[]).find(a => {
           const af = (a.nombre + " " + (a.apellidos||"")).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
           return af === fullName || af.includes(nombre.toLowerCase());
         });
         if(!alumno) return;
-        // Mapear notas por asignatura y evaluación
         const ne = alumno.notasEval || {"1":{},"2":{},"3":{},"4":{},"5":{}};
         ["1","2","3","4","5"].forEach(e => { if(!ne[e]) ne[e] = {}; });
         SUBJECTS.forEach(subj => {
           const subjNorm = subj.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/ /g,"");
           [1,2,3,4,5].forEach(e => {
             const keys = [
-              subjNorm + "eval" + e,
-              subjNorm + "e" + e,
-              subjNorm + e,
+              subjNorm + "eval" + e, subjNorm + "e" + e, subjNorm + e,
               subj.toLowerCase().replace(/ /g,"_") + "_eval" + e,
-              subj.toLowerCase().replace(/ /g,"") + e,
-              // short aliases
               (subj==="Lengua castellana"?"lengua":subj==="Matemáticas"?"mates":subj==="Inglés"?"ingles":subj==="Natural Science"?"natural":subj==="Social Science"?"social":subj==="Educación Física"?"ef":subj==="Educación Cívica"?"civica":subj.toLowerCase().slice(0,4)) + e
             ];
             for (const k of keys) {
@@ -1279,7 +1281,83 @@ function importarNotas(ev){
     } catch(e){ console.error(e); toast("No se pudo leer el archivo de notas"); }
   };
   reader.readAsArrayBuffer(file);
-  ev.target.value = ""; // reset
+  ev.target.value = "";
+}
+
+function importarEstadillo(aoa){
+  const p = P();
+  const normName = s => String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9 ]/g,"").trim();
+  // Find subject column groups from header row containing EART/LCAS
+  let headerRow = -1;
+  for (let i = 0; i < aoa.length; i++) {
+    if (aoa[i].some(c => String(c).includes("EART") || String(c).includes("LCAS"))) {
+      headerRow = i;
+      break;
+    }
+  }
+  if (headerRow < 0) { toast("No se reconoció el formato Estadillo"); return; }
+  const colMap = {}; // subject code -> main column index
+  aoa[headerRow].forEach((c, idx) => {
+    const s = String(c).trim();
+    if (["EART","EFIS","LCAS","ING","MAT","CNAT","CSOC","REL","MC","TV"].includes(s)) colMap[s] = idx;
+  });
+  const subjectMap = {
+    "EART": "Plástica", // and Música nearby
+    "EFIS": "Educación Física",
+    "LCAS": "Lengua castellana",
+    "ING": "Inglés",
+    "MAT": "Matemáticas",
+    "CNAT": "Natural Science",
+    "CSOC": "Social Science",
+    "REL": "Religión",
+    "MC": "Educación Cívica"
+  };
+  let updated = 0;
+  for (let i = 0; i < aoa.length; i++) {
+    const nameCell = String(aoa[i][0] || "").trim();
+    if (!nameCell || nameCell === "Alumno" || nameCell.includes("Totales")) continue;
+    // Student name row found
+    const full = normName(nameCell);
+    const alumno = (p.alumnos||[]).find(a => {
+      const af = normName((a.nombre || "") + " " + (a.apellidos || ""));
+      return af === full || full.includes(af) || af.includes(full.split(" ")[0]);
+    });
+    if (!alumno) continue;
+    // Look ahead for evaluation rows and letter grade rows
+    for (let j = i+1; j < Math.min(i+8, aoa.length); j++) {
+      const evLabel = String(aoa[j][4] || "").trim();
+      const m = evLabel.match(/^(\d)ª\s*Ev/i);
+      if (!m) continue;
+      const evalNum = m[1]; // "1"
+      // Letter grade row is usually the next one
+      const letterRow = aoa[j+1] || [];
+      const ne = alumno.notasEval || {"1":{},"2":{},"3":{},"4":{},"5":{}};
+      if (!ne[evalNum]) ne[evalNum] = {};
+      Object.keys(subjectMap).forEach(code => {
+        const col = colMap[code];
+        if (col == null) return;
+        const letter = String(letterRow[col] || "").trim();
+        const num = String(aoa[j][col] || "").trim();
+        const val = letter && /^[ABCD]$/i.test(letter) ? letter.toUpperCase() : (num && !isNaN(num) ? num : "");
+        if (val) {
+          const subj = subjectMap[code];
+          ne[evalNum][subj] = val;
+          if (code === "EART") {
+            // Música is often next column
+            const musLetter = String(letterRow[col+1] || "").trim();
+            const musNum = String(aoa[j][col+1] || "").trim();
+            const musVal = musLetter && /^[ABCD]$/i.test(musLetter) ? musLetter.toUpperCase() : (musNum && !isNaN(musNum) ? musNum : "");
+            if (musVal) ne[evalNum]["Música"] = musVal;
+          }
+        }
+      });
+      alumno.notasEval = ne;
+      updated++;
+    }
+  }
+  save();
+  toast(updated ? updated + " alumnos actualizados desde Estadillo" : "No se encontraron alumnos coincidentes");
+  go("alumnos");
 }
 
 function importarTabla(ev){

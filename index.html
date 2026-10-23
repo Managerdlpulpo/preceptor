@@ -708,11 +708,15 @@ function renderFicha(a){
                 if (!info) return "";
                 const isObj = typeof info === "object" && info !== null;
                 const global = isObj ? (info.global || "") : String(info);
+                const actitud = isObj ? (info.actitud || "") : "";
                 const items = isObj ? (info.items || {}) : {};
                 return `<div style="margin-bottom:10px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:10px">
-                  <div style="display:flex;justify-content:space-between;align-items:center">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
                     <strong>${esc(subj)}</strong>
-                    ${global ? `<span class="badge ok" style="font-size:.85rem">${esc(global)}</span>` : ""}
+                    <div style="display:flex;gap:6px">
+                      ${global ? `<span class="badge ok" title="Nota global">${esc(global)}</span>` : ""}
+                      ${actitud ? `<span class="badge" title="Actitud">${esc(actitud)}</span>` : ""}
+                    </div>
                   </div>
                   ${Object.keys(items).length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
                     ${Object.entries(items).map(([k,v]) => v ? `<span class="chip" style="font-size:.72rem">${esc(k)}: <b>${esc(v)}</b></span>` : "").join("")}
@@ -1379,20 +1383,31 @@ function importarEstadillo(aoa){
         "REL": { subj: "Religión", items: [{col:50, name:"Conocimientos"}, {col:51, name:"Oraciones"}] },
         "MC": { subj: "Educación Cívica", items: [{col:58, name:"Amistad"}, {col:59, name:"Orden"}, {col:60, name:"Responsabilidad"}, {col:61, name:"Servicio"}, {col:62, name:"Respeto"}, {col:63, name:"Trabajo Personal"}] }
       };
+      // The name row is the one that triggered this student (aoa[i])
+      const nameRow = aoa[i] || [];
       Object.keys(itemDefs).forEach(code => {
         const def = itemDefs[code];
         const col = colMap[code];
+        // Global grade is the number in the NAME row (same row as student name)
+        const globalRaw = col != null ? String(nameRow[col] || "").trim() : "";
+        const global = globalRaw && !isNaN(globalRaw) ? globalRaw : "";
+        // Letter (attitude / qualitative) from the letter row, if present
         const letter = col != null ? String(letterRow[col] || "").trim() : "";
-        const global = letter && /^[ABCD]$/i.test(letter) ? letter.toUpperCase() : "";
+        const actitud = letter && /^[ABCD]$/i.test(letter) ? letter.toUpperCase() : "";
         const items = {};
         def.items.forEach(it => {
           const v = String(aoa[j][it.col] || "").trim();
           if (v) items[it.name] = v;
         });
-        if (global || Object.keys(items).length) {
-          ne[evalNum][def.subj] = { global, items };
+        if (global || actitud || Object.keys(items).length) {
+          ne[evalNum][def.subj] = { global, actitud, items };
           if (code === "EART" && items["Música"]) {
-            ne[evalNum]["Música"] = { global: "", items: { "Música": items["Música"] } };
+            const musGlobal = String(nameRow[col+1] || "").trim();
+            ne[evalNum]["Música"] = { 
+              global: musGlobal && !isNaN(musGlobal) ? musGlobal : "", 
+              actitud: String(letterRow[col+1] || "").trim().toUpperCase() || "",
+              items: { "Música": items["Música"] } 
+            };
           }
         }
       });
